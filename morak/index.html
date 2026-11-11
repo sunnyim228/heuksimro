@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b1d18">
+<title>모락모락 — 솥골 식당 이야기</title>
+<style>
+@font-face{font-family:Galmuri;src:url(fonts/Galmuri11.woff2) format('woff2');font-display:swap}
+:root{--ink:#4a3328;--paper:#fff4dc;--paper2:#f3e2bd;--accent:#e8884a;--green:#5fa644;--red:#c4553f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:clamp(14px,1.6vmin + 8px,22px)}
+html,body{margin:0;height:100%;overflow:hidden;background:#2b1d18;color:var(--ink);
+  font-family:Galmuri,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas#game{position:fixed;left:0;top:0;image-rendering:pixelated;image-rendering:crisp-edges}
+img.ic{image-rendering:pixelated;width:2.2rem;height:2.2rem;vertical-align:middle}
+img.ic.s{width:1.4rem;height:1.4rem}
+button{font:inherit;color:inherit;cursor:pointer}
+.box{background:var(--paper);border:3px solid var(--ink);border-radius:6px;box-shadow:0 4px 0 rgba(43,29,24,.35)}
+.btn{background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:6px;padding:.5rem .9rem;box-shadow:0 3px 0 var(--ink)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.btn.main{background:var(--accent);color:#fff8ea}
+.btn[disabled]{opacity:.45}
+.hide{display:none!important}
+
+/* HUD */
+#hud{position:fixed;inset:0;pointer-events:none;padding:max(.5rem,env(safe-area-inset-top)) max(.5rem,env(safe-area-inset-right)) 0 max(.5rem,env(safe-area-inset-left))}
+#hud>*{pointer-events:auto}
+#hud-top{display:flex;gap:.4rem;align-items:flex-start;justify-content:space-between}
+#status{padding:.35rem .6rem;font-size:.85rem;line-height:1.5;white-space:nowrap}
+#status b{font-weight:normal;color:var(--red)}
+#hud-btns{display:flex;gap:.35rem}
+#hud-btns .btn{padding:.35rem .6rem;font-size:.85rem}
+#goal{margin-top:.4rem;max-width:26rem;padding:.4rem .6rem;font-size:.8rem;line-height:1.45;background:rgba(255,244,220,.94)}
+#goal .lab{color:var(--accent);margin-right:.3rem}
+#goal.min .txt{display:none}
+#svcbar{margin-top:.4rem;display:inline-block;padding:.3rem .6rem;font-size:.8rem;background:#fff8ea}
+
+#toasts{position:fixed;left:50%;top:22%;transform:translateX(-50%);display:flex;flex-direction:column;gap:.4rem;align-items:center;pointer-events:none;width:min(92vw,30rem);z-index:30}
+.toast{padding:.5rem .8rem;font-size:.85rem;line-height:1.5;text-align:center;white-space:pre-line;animation:pop .25s}
+@keyframes pop{from{transform:scale(.8);opacity:0}}
+#floaters{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.bubble{position:absolute;transform:translate(-50%,-100%);background:#fff;border:2px solid var(--ink);border-radius:8px;padding:.15rem .45rem;font-size:.75rem;white-space:nowrap}
+.float{position:absolute;transform:translate(-50%,-100%);font-size:.85rem;color:#fff8ea;text-shadow:1px 1px 0 var(--ink),-1px 1px 0 var(--ink),1px -1px 0 var(--ink),-1px -1px 0 var(--ink);white-space:nowrap}
+
+/* 대화 */
+#black{position:fixed;inset:0;background:#1d1411;opacity:0;pointer-events:none;transition:opacity .35s;z-index:10}
+#black.on{opacity:1}
+#dlg-layer{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;padding:.6rem .6rem max(.8rem,env(safe-area-inset-bottom))}
+#dialog{width:min(100%,40rem);min-height:6.6rem;padding:.7rem .9rem;display:flex;gap:.8rem;position:relative}
+#dialog canvas{image-rendering:pixelated;width:4.2rem;height:3.9rem;flex:none;background:var(--paper2);border:2px solid var(--ink);border-radius:4px}
+#dlg-name{position:absolute;left:.8rem;top:-1.05rem;background:var(--accent);color:#fff8ea;border:3px solid var(--ink);border-radius:6px;padding:.05rem .6rem;font-size:.85rem}
+#dlg-text{flex:1;line-height:1.6;white-space:pre-line;font-size:1rem}
+#dlg-next{position:absolute;right:.7rem;bottom:.3rem;animation:bob .8s infinite;color:var(--accent)}
+@keyframes bob{50%{transform:translateY(3px)}}
+#dlg-layer.center{align-items:center}
+#dlg-layer.center #dialog{background:none;border:none;box-shadow:none;color:#fff4dc;text-align:center;justify-content:center}
+#dlg-layer.center #dlg-text{font-size:1.1rem;line-height:1.9;flex:none}
+#dlg-layer.center #dlg-next{position:static;display:block;margin-top:1rem}
+#dlg-layer.center #dialog{flex-direction:column;align-items:center}
+#choices{position:absolute;right:0;bottom:calc(100% + .6rem);display:flex;flex-direction:column;gap:.45rem;align-items:flex-end}
+#letter{position:fixed;inset:0;z-index:25;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(29,20,17,.55)}
+#letter .paper{max-width:26rem;max-height:86vh;overflow:auto;background:#fbf3dc;border:3px solid #a8794f;border-radius:4px;padding:1.4rem 1.5rem;line-height:1.85;white-space:pre-line;font-size:.95rem;
+  background-image:repeating-linear-gradient(transparent 0 1.72rem,#ead9b4 1.72rem 1.78rem);box-shadow:0 8px 0 rgba(0,0,0,.25)}
+#letter .tap{display:block;text-align:right;color:#a8794f;font-size:.8rem;margin-top:.6rem}
+
+/* 패널 */
+#panel-layer{position:fixed;inset:0;z-index:22;background:rgba(29,20,17,.45);display:flex;align-items:center;justify-content:center;padding:.8rem}
+#panel{width:min(100%,34rem);max-height:88vh;display:flex;flex-direction:column}
+#panel header{display:flex;justify-content:space-between;align-items:center;padding:.55rem .8rem;border-bottom:3px solid var(--ink);background:var(--paper2);border-radius:3px 3px 0 0}
+#panel header button{border:none;background:none;font-size:1.1rem;padding:.1rem .4rem}
+#panel-body{padding:.8rem;overflow:auto;touch-action:pan-y;font-size:.9rem;line-height:1.55}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(5.2rem,1fr));gap:.5rem}
+.cell{background:#fffaf0;border:2px solid var(--ink);border-radius:6px;padding:.4rem .2rem;text-align:center;font-size:.75rem;position:relative}
+button.cell{box-shadow:0 2px 0 var(--ink)}
+.cell .n{position:absolute;right:.25rem;top:.1rem;font-size:.8rem;color:var(--red)}
+.sec{margin:.9rem 0 .4rem;color:var(--accent);font-size:.85rem}
+.sec:first-child{margin-top:0}
+.rcp{background:#fffaf0;border:2px solid var(--ink);border-radius:6px;padding:.55rem .7rem;margin-bottom:.5rem}
+.rcp.torn{border-style:dashed;color:#a08a76;background:none;text-align:center;font-size:.8rem}
+.rcp h4{margin:0 0 .2rem;font-weight:normal;font-size:1rem;display:flex;align-items:center;gap:.4rem}
+.rcp .how{font-size:.8rem}.rcp .memo{font-size:.78rem;color:#8a6a52;margin-top:.25rem}
+.rcp .can{margin-left:auto;font-size:.75rem;color:var(--green)}
+.row{display:flex;align-items:center;gap:.6rem;padding:.35rem 0;border-bottom:1px dashed #d9c49c}
+.row .grow{flex:1}
+.center{text-align:center}
+
+/* 타이틀 */
+#title{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:linear-gradient(rgba(43,29,24,.25),rgba(43,29,24,.7));color:#fff4dc;text-align:center;padding:1rem}
+#title h1{margin:0;font-size:3.4rem;font-weight:normal;letter-spacing:.1em;text-shadow:0 4px 0 var(--ink),3px 0 0 var(--ink),-3px 0 0 var(--ink),0 -3px 0 var(--ink)}
+#title .sub{font-size:1rem;text-shadow:1px 2px 0 var(--ink)}
+#title .steam{font-size:1.2rem;letter-spacing:.9em;animation:steam 2.4s infinite ease-in-out;opacity:.9}
+@keyframes steam{50%{transform:translateY(-6px);opacity:.5}}
+#title label{font-size:.9rem;text-shadow:1px 2px 0 var(--ink)}
+#title input{font:inherit;width:8rem;text-align:center;padding:.35rem;border:3px solid var(--ink);border-radius:6px;background:var(--paper);color:var(--ink);user-select:text;-webkit-user-select:text}
+#title .btns{display:flex;flex-direction:column;gap:.6rem;min-width:12rem}
+#title small{opacity:.8;font-size:.7rem}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="floaters"></div>
+
+<div id="hud" class="hide">
+  <div id="hud-top">
+    <div id="status" class="box"></div>
+    <div id="hud-btns">
+      <button class="btn" data-open="bag">가방</button>
+      <button class="btn" data-open="book">수첩</button>
+      <button class="btn" data-open="set">설정</button>
+    </div>
+  </div>
+  <div id="goal" class="box"><span class="lab">할 일 ▸</span><span class="txt"></span></div><br>
+  <div id="svcbar" class="box hide"></div>
+</div>
+
+<div id="toasts"></div>
+<div id="black"></div>
+
+<div id="dlg-layer" class="hide">
+  <div id="dialog" class="box">
+    <div id="dlg-name"></div>
+    <canvas id="dlg-face" width="56" height="52"></canvas>
+    <div id="dlg-text"></div>
+    <span id="dlg-next">▼</span>
+    <div id="choices"></div>
+  </div>
+</div>
+
+<div id="letter" class="hide"><div class="paper"><span id="letter-text"></span><span class="tap">눌러서 닫기 ▸</span></div></div>
+
+<div id="panel-layer" class="hide">
+  <div id="panel" class="box">
+    <header><span id="panel-title"></span><button id="panel-x" aria-label="닫기">✕</button></header>
+    <div id="panel-body"></div>
+  </div>
+</div>
+
+<div id="title">
+  <div class="steam">~ ~ ~</div>
+  <h1>모락모락</h1>
+  <div class="sub">솥골 식당 이야기 · 1부 「식은 솥」</div>
+  <label>이름 <input id="name" maxlength="6" value="하루" autocomplete="off"></label>
+  <div class="btns">
+    <button class="btn main hide" id="btn-continue">이어하기</button>
+    <button class="btn" id="btn-new">새로 시작</button>
+  </div>
+  <small>자동 저장 · 이 기기에만 저장돼요</small>
+</div>
+
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
