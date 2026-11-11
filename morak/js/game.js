@@ -235,7 +235,7 @@ function newState(name) {
   return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 } };
 }
 function save() {
-  if (!G || mode !== 'play') return;
+  if (!G || mode !== 'play' || busy) return; // 대화·장면 도중에는 저장하지 않아요 (장면이 끝나면 저장)
   const invAll = { ...G.inv };
   for (const id of looseItems()) invAll[id] = (invAll[id] || 0) + 1;
   // 영업 중에 닫으면 가게 안 문 앞에서 다시 시작해요
@@ -947,7 +947,7 @@ function startGame(state, isNew) {
   $('#title').classList.add('hide'); $('#hud').classList.remove('hide');
   Au.unlock(); Au.setMood(G.time >= 19 * 60 ? 'night' : 'day');
   refreshHUD();
-  if (isNew) runScene(story.scenes.intro);
+  if (isNew || G.step === 'intro') runScene(story.scenes.intro);
 }
 function boot() {
   resize();
