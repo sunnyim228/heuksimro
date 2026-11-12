@@ -1,6 +1,6 @@
 // 모락모락 — 솥골 식당 이야기 : 게임 엔진
 import { T, buildSprites, renderGround, makeChar, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
-import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES } from './data.js';
+import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES } from './data.js';
 import { makeStory, GOALS } from './story.js';
 import * as Au from './audio.js';
 
@@ -87,7 +87,9 @@ function buildVillage() {
   const deco = (spr, x, y, o = {}) => { keep(x, y, x + (o.w || 1) - 1, y); return add(m, { type: o.type || 'deco', x, y, spr, ...o }); };
   deco(SPR.crates, 18, 15); deco(SPR.well, 20, 14, { type: 'look', id: 'well', act: true, tall: true });
   deco(SPR.lamp, 24, 16); deco(SPR.lamp, 21, 19);
-  deco(SPR.busstop, 43, 16, { type: 'look', id: 'busstop', act: true, tall: true });
+  deco(SPR.busstop, 43, 16, { type: 'bus', act: true, tall: true });
+  deco(SPR.jars, 32, 15, { type: 'craft', act: true, tall: true });
+  deco(SPR.noticeboard, 26, 19, { type: 'reqboard', act: true, tall: true });
   deco(SPR.sign, 24, 10, { type: 'look', id: 'sign_forest', act: true });
   deco(SPR.sign, 24, 22, { type: 'look', id: 'sign_beach', act: true });
   deco(SPR.bench, 25, 28, { w: 2, type: 'look', id: 'bench', act: true });
@@ -173,9 +175,9 @@ const tables = () => MAPS.shop.tables.filter(visible);
 function priceOf(rid) {
   const r = RECIPES[rid];
   const m = (G.trait === 'fire' && r.cooker === 'pan') || (G.trait === 'soup' && r.cooker !== 'pan') ? 1.25 : 1;
-  return Math.round(r.price * m);
+  return Math.round(r.price * m * (G.event === 'rain' && r.cooker === 'pan' ? 1.3 : 1));
 }
-const buyPrice = id => Math.max(1, ITEMS[id].price - (G.trait === 'thrift' ? 1 : 0));
+const buyPrice = (id, base = ITEMS[id].price) => Math.max(1, base - (G.trait === 'thrift' ? 1 : 0) + (G.event === 'pricey' ? 1 : G.event === 'sale' ? -1 : 0));
 const sellPrice = id => RECIPES[id] ? Math.floor(priceOf(id) * 0.6) : Math.max(1, Math.floor(VALUE[baseOf(id)] / 2));
 function gainRep(n) {
   const r0 = rank(); G.rep = (G.rep || 0) + n;
@@ -254,9 +256,29 @@ function servings(rid, reserved = {}) {
   return Math.max(0, n);
 }
 
+const STEPS = Object.keys(GOALS);
+const opened = () => STEPS.indexOf(G.step) > STEPS.indexOf('sleep1'); // 2일째 아침부터 마을 기능이 열려요
+const loanLimit = () => 100 + 100 * rank();
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+function applyLook() {
+  const L = G.look, hat = WEAR.find(w => w.id === L.hat) || WEAR.find(w => w.id === 'hat_band'), shirt = WEAR.find(w => w.id === L.shirt) || WEAR[0];
+  CHARS.player = makeChar({ ...LOOKS.player, hair: L.hair, style: L.style, shirt: shirt.col, hat: hat.hat, hatCol: hat.col, apron: L.apron });
+  delete faceCache.player;
+}
+const ensureReqs = () => { if (opened() && G.reqDay !== G.day) genRequests(); };
+function genRequests() {
+  G.reqs = []; G.reqDay = G.day;
+  const people = [...REQ_PEOPLE].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < 2 + (rank() >= 3 ? 1 : 0); i++) {
+    const known = G.recipes.filter(r => RECIPES[r] && r !== 'gukbap');
+    if (i > 0 && known.length && Math.random() < 0.5) { const item = pickOne(known); G.reqs.push({ who: people[i], item, n: 1, coins: Math.round(priceOf(item) * 1.6), rep: 2 }); }
+    else { const item = pickOne(REQ_ITEMS), n = 2 + Math.floor(Math.random() * 3); G.reqs.push({ who: people[i], item, n, coins: VALUE[item] * n * 2 + 6, rep: 1 }); }
+  }
+}
+
 /* ═════════ 저장 ═════════ */
 function newState(name) {
-  return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {} };
+  return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true } };
 }
 function save() {
   if (!G || mode !== 'play' || busy) return; // 대화·장면 도중에는 저장하지 않아요 (장면이 끝나면 저장)
@@ -297,9 +319,10 @@ function clearFloaters() { for (const f of floaters) f.el.remove(); floaters.len
 
 function refreshHUD() {
   if (!G) return;
+  ensureReqs();
   const h = Math.floor(G.time / 60), mi = Math.floor(G.time % 60 / 10) * 10;
   const ap = h < 12 ? '오전' : '오후', hh = h % 12 === 0 ? 12 : h % 12;
-  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢`;
+  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}`;
   const goal = GOALS[G.step] || '';
   $('#goal').classList.toggle('hide', !goal || !!svc);
   $('#goal .txt').textContent = goal;
@@ -382,10 +405,11 @@ function openPanel(title, html, onClick) {
   return new Promise(resolve => {
     busy++;
     $('#panel-title').textContent = title; $('#panel-body').innerHTML = html; $('#panel-layer').classList.remove('hide');
+    $('#toasts').classList.add('low'); // 패널이 열려 있을 땐 알림을 아래로
     const body = $('#panel-body');
     const handler = e => { const el = e.target.closest('[data-a]'); if (el && onClick) onClick(el.dataset.a, el.dataset.v, api); };
     const api = { close, set: h => { body.innerHTML = h; } };
-    function close(v) { body.removeEventListener('click', handler); $('#panel-layer').classList.add('hide'); panelClose = null; busy--; refreshHUD(); resolve(v); }
+    function close(v) { body.removeEventListener('click', handler); $('#panel-layer').classList.add('hide'); $('#toasts').classList.remove('low'); panelClose = null; busy--; refreshHUD(); resolve(v); }
     body.addEventListener('click', handler);
     panelClose = () => close();
   });
@@ -403,7 +427,7 @@ function invHTML(action) {
   if (!gs.length) return '<p class="center">텅 비었어요.<br>텃밭·숲·바닷가에서 재료를 구해 봐요.</p>';
   return gs.map(([t, ids]) => `<div class="sec">${t}</div><div class="grid">${ids.map(i => cell(i, G.inv[i], action)).join('')}</div>`).join('');
 }
-function openBag() { return openPanel('가방', invHTML(null) + (G.flags.rod ? `<div class="sec">도구</div><div class="grid"><div class="cell"><img class="ic" src="${iconURL('rod')}"><br>낚싯대</div></div>` : '')); }
+function openBag() { return openPanel('가방', `<p class="center"><button class="btn" data-a="wardrobe">옷장 열기</button></p>` + invHTML(null) + (G.flags.rod ? `<div class="sec">도구</div><div class="grid"><div class="cell"><img class="ic" src="${iconURL('rod')}"><br>낚싯대</div></div>` : ''), (a, v, p) => { if (a === 'wardrobe') { p.close(); openWardrobe(); } }); }
 function openBook() {
   let h = '<div class="sec">할머니의 레시피 수첩</div>';
   for (const id of RECIPE_ORDER) {
@@ -414,6 +438,15 @@ function openBook() {
       <div class="how">${COOKER_NAME[r.cooker]}에 ▸ ${r.ing.map(i => `<img class="ic s" src="${iconURL(i)}">${itemName(i)}`).join(' + ')}</div>
       <div class="memo">"${r.memo}"<br>— ${r.from} · ${priceOf(id)}닢</div></div>`;
   }
+  h += `<div class="sec">길에서 얻은 레시피</div>`;
+  const got = TRAVEL_ORDER.filter(id => G.recipes.includes(id));
+  for (const id of got) {
+    const r = RECIPES[id], n = servings(id);
+    h += `<div class="rcp"><h4><img class="ic" src="${iconURL(id)}">${r.name}<span class="can">${n > 0 ? `지금 ${n}그릇 가능` : '재료 부족'}</span></h4>
+      <div class="how">${COOKER_NAME[r.cooker]}에 ▸ ${r.ing.map(i => `<img class="ic s" src="${iconURL(i)}">${itemName(i)}`).join(' + ')}</div>
+      <div class="memo">"${r.memo}"<br>— ${r.from} · ${priceOf(id)}닢</div></div>`;
+  }
+  if (got.length < TRAVEL_ORDER.length) h += `<div class="rcp torn">버스를 타고 다른 고장에 가면 그곳의 레시피를 구할 수 있어요</div>`;
   const slots = Math.min(3, rank());
   h += `<div class="sec">나만의 요리 (${G.custom.length}/${slots}) — 별이 오르면 칸이 늘어요</div>`;
   for (const c of G.custom) {
@@ -478,6 +511,132 @@ function openCreator() {
     }
     p.set(html());
   });
+}
+/* ── 마을금고 ── */
+function openBank() {
+  const B = G.bank;
+  const html = () => `<p>"돈 얘기는 깔끔해야지." — 가진 돈 <b>${G.coins}</b>닢</p>
+    <div class="sec">예금 — 하룻밤 이자 1% (하루 최대 20닢)</div>
+    <div class="row"><span class="grow">맡긴 돈 <b>${B.dep}</b>닢</span><button class="btn" data-a="dep" data-v="50">50 맡기기</button><button class="btn" data-a="wd" data-v="all">모두 찾기</button></div>
+    <div class="sec">대출 — 하룻밤 이자 3% · 한도 ${loanLimit()}닢</div>
+    <div class="row"><span class="grow">빚 <b>${B.loan}</b>닢</span><button class="btn" data-a="loan" data-v="50">50 빌리기</button><button class="btn" data-a="pay" data-v="50">50 갚기</button><button class="btn" data-a="pay" data-v="all">모두 갚기</button></div>
+    <p><small>한도는 식당 별이 오를수록 늘어요. 이자가 쌓여 빚이 한도를 넘으면, 영업 수익의 30%가 자동으로 빚을 갚는 데 들어가요. 가게를 빼앗기는 일은 없어요.</small></p>`;
+  return openPanel('솥골 마을금고', html(), (a, v, p) => {
+    if (a === 'dep') { const n = Math.min(50, G.coins); if (!n) return no('맡길 돈이 없어요.'); G.coins -= n; B.dep += n; }
+    else if (a === 'wd') { G.coins += B.dep; B.dep = 0; }
+    else if (a === 'loan') { if (B.loan + 50 > loanLimit()) return no('한도를 넘어요. 식당 별이 오르면 더 빌릴 수 있어요.'); B.loan += 50; G.coins += 50; G.flags.borrowed = true; }
+    else if (a === 'pay') { const n = Math.min(v === 'all' ? B.loan : 50, B.loan, G.coins); if (!n) return no(B.loan ? '갚을 돈이 없어요.' : '갚을 빚이 없어요.'); G.coins -= n; B.loan -= n; }
+    else return;
+    Au.sfx('coin'); p.set(html()); refreshHUD(); checkChallenges();
+  });
+}
+/* ── 건조대·장독 (재료 가공) ── */
+function openCraft() {
+  const slots = () => owns('rack') ? 4 : 2;
+  const html = () => `<p>재료를 널어 두면 <b>하룻밤 뒤</b>에 완성돼요. (자리 ${G.craft.length}/${slots()})</p>
+    <div class="sec">널어 둔 것</div>` + (G.craft.length ? G.craft.map((c, i) =>
+    `<div class="row"><img class="ic" src="${iconURL(c.id)}"><span class="grow">${itemName(c.id)}</span>${c.ready ? `<button class="btn main" data-a="get" data-v="${i}">거두기</button>` : '<span><small>내일 아침에 완성</small></span>'}</div>`).join('') : '<p><small>비어 있어요.</small></p>') +
+    `<div class="sec">새로 널기</div>` + CRAFTS.map(c => {
+      const need = Object.entries(c.from), ok = need.every(([k, n]) => inv(k) >= n) && G.craft.length < slots();
+      return `<div class="row"><img class="ic" src="${iconURL(c.id)}"><span class="grow">${itemName(c.id)} <small>(팔면 ${sellPrice(c.id)}닢)</small><br><small>${need.map(([k, n]) => `${itemName(k)} ${n}개 (가진 것 ${inv(k)})`).join(', ')} — ${c.how}</small></span>
+        <button class="btn" data-a="make" data-v="${c.id}" ${ok ? '' : 'disabled'}>널기</button></div>`;
+    }).join('') + `<p><small>가공한 재료는 「나만의 요리」에 넣으면 값이 크게 오르고, 만물상에 팔아도 좋아요.</small></p>`;
+  return openPanel('건조대와 장독', html(), (a, v, p) => {
+    if (a === 'get') { const c = G.craft[+v]; if (!c || !c.ready) return; G.craft.splice(+v, 1); addItem(c.id); Au.sfx('pick'); }
+    else if (a === 'make') {
+      const c = CRAFTS.find(x => x.id === v); if (!c || G.craft.length >= slots() || !Object.entries(c.from).every(([k, n]) => inv(k) >= n)) return;
+      for (const [k, n] of Object.entries(c.from)) addItem(k, -n);
+      G.craft.push({ id: c.id, ready: false }); Au.sfx('put');
+    } else return;
+    p.set(html());
+  });
+}
+/* ── 의뢰 게시판 ── */
+function openBoard() {
+  const html = () => `<p>마을 사람들이 붙여 둔 쪽지. 매일 아침 새로 붙어요.</p>` + (G.reqs.length ? G.reqs.map((r, i) =>
+    `<div class="row"><img class="ic" src="${iconURL(r.item)}"><span class="grow ${r.done ? 'done' : ''}">${r.done ? '✔ ' : ''}${r.who}<br><small>"${esc(itemName(r.item))} ${r.n}${RECIPES[r.item] ? '그릇' : '개'}만 부탁해요." (가진 것 ${inv(r.item)})</small></span>
+     <span><small>${r.coins}닢 · 평판 +${r.rep}</small></span>${r.done ? '' : `<button class="btn" data-a="give" data-v="${i}" ${inv(r.item) >= r.n ? '' : 'disabled'}>건네기</button>`}</div>`).join('') : '<p><small>오늘은 붙은 쪽지가 없어요.</small></p>');
+  return openPanel('마을 게시판', html(), (a, v, p) => {
+    const r = G.reqs[+v]; if (a !== 'give' || !r || r.done || inv(r.item) < r.n) return;
+    addItem(r.item, -r.n); r.done = true; G.coins += r.coins; G.stats.req = (G.stats.req || 0) + 1; Au.sfx('coin');
+    toast(`${r.who}: "고마워요, 덕분에 살았어요!"  +${r.coins}닢`, 'heart', 3600);
+    gainRep(r.rep); checkChallenges(); p.set(html()); refreshHUD();
+  });
+}
+/* ── 옷장 ── */
+function openWardrobe() {
+  const L = G.look, has = w => w.free || G.wear.includes(w.id);
+  const sw = (col, on, a, v, label) => `<button class="cell ${on ? 'on' : ''}" data-a="${a}" data-v="${v}"><span style="display:inline-block;width:1.6rem;height:1.6rem;background:${col};border:2px solid var(--ink);border-radius:4px"></span>${label ? '<br>' + label : ''}</button>`;
+  const html = () => `<p class="center"><img src="${CHARS.player.down[0].toDataURL()}" style="image-rendering:pixelated;width:6rem;background:var(--paper2);border:3px solid var(--ink);border-radius:6px"></p>
+    <div class="sec">머리 모양</div><div class="grid">${HAIR_STYLES.map(([k, n]) => `<button class="cell ${L.style === k ? 'on' : ''}" data-a="style" data-v="${k}">${n}</button>`).join('')}</div>
+    <div class="sec">머리 색</div><div class="grid">${HAIR_COLORS.map(c => sw(c, L.hair === c, 'hair', c)).join('')}</div>
+    <div class="sec">옷</div><div class="grid">${WEAR.filter(w => w.kind === 'shirt' && has(w)).map(w => sw(w.col, L.shirt === w.id, 'shirt', w.id, w.name)).join('')}</div>
+    <div class="sec">모자</div><div class="grid">${WEAR.filter(w => w.kind === 'hat' && has(w)).map(w => sw(w.col, L.hat === w.id, 'hat', w.id, w.name)).join('')}</div>
+    <div class="sec">앞치마</div><div class="grid"><button class="cell ${L.apron ? 'on' : ''}" data-a="apron" data-v="1">두른다</button><button class="cell ${L.apron ? '' : 'on'}" data-a="apron" data-v="">벗는다</button></div>
+    <p><small>옷과 모자는 버스를 타고 간 고장마다 다른 것을 팔아요. (지금 ${WEAR.filter(has).length}/${WEAR.length}벌)</small></p>`;
+  return openPanel('옷장', html(), (a, v, p) => {
+    if (a === 'apron') L.apron = !!v; else if (['style', 'hair', 'shirt', 'hat'].includes(a)) L[a] = v; else return;
+    applyLook(); Au.sfx('blip'); p.set(html());
+  });
+}
+/* ── 버스: 다른 고장 다녀오기 ── */
+function openPlace(pid) {
+  const pl = PLACES[pid], wear = () => WEAR.filter(w => w.at === pid);
+  const html = () => `<p>가진 돈 <b>${G.coins}</b>닢</p><div class="sec">이 고장 재료</div>` + pl.goods.map(([id, pr]) =>
+    `<div class="row"><img class="ic" src="${iconURL(id)}"><span class="grow">${ITEMS[id].name} <small>(가진 것 ${inv(id)})</small></span><span>${buyPrice(id, pr)}닢</span><button class="btn" data-a="buy" data-v="${id}" ${G.coins < buyPrice(id, pr) ? 'disabled' : ''}>사기</button></div>`).join('') +
+    `<div class="sec">이 고장 레시피</div>` + (G.recipes.includes(pl.recipe[0]) ? `<p class="done">✔ 「${RECIPES[pl.recipe[0]].name}」 — 이미 배웠어요</p>` :
+    `<div class="row"><img class="ic" src="${iconURL(pl.recipe[0])}"><span class="grow">「${RECIPES[pl.recipe[0]].name}」 적어 주는 값</span><span>${pl.recipe[1]}닢</span><button class="btn" data-a="rcp" ${G.coins < pl.recipe[1] ? 'disabled' : ''}>배우기</button></div>`) +
+    `<div class="sec">옷과 모자</div>` + wear().map(w => G.wear.includes(w.id) ? `<p class="done">✔ ${w.name}</p>` :
+    `<div class="row"><span style="display:inline-block;width:1.6rem;height:1.6rem;background:${w.col};border:2px solid var(--ink);border-radius:4px"></span><span class="grow">${w.name}</span><span>${w.cost}닢</span><button class="btn" data-a="wear" data-v="${w.id}" ${G.coins < w.cost ? 'disabled' : ''}>사기</button></div>`).join('') +
+    (pid === 'farm' ? `<div class="sec">납품 계약</div>` + (G.flags.contract ? '<p class="done">✔ 매일 아침 배추 2 · 고추 1 · 달걀 2가 문 앞에 와요</p>' :
+    `<div class="row"><span class="grow">농장과 손잡기<br><small>매일 아침 배추 2 · 고추 1 · 달걀 2 배달</small></span><span>120닢</span><button class="btn" data-a="contract" ${G.coins < 120 ? 'disabled' : ''}>계약</button></div>`) : '') +
+    `<p class="center"><button class="btn main" data-a="back">솥골로 돌아간다</button></p>`;
+  return openPanel(pl.name, html(), (a, v, p) => {
+    if (a === 'back') return p.close();
+    if (a === 'buy') { const g = pl.goods.find(x => x[0] === v), pr = buyPrice(v, g[1]); if (G.coins < pr) return; G.coins -= pr; addItem(v); }
+    else if (a === 'rcp') { if (G.coins < pl.recipe[1]) return; G.coins -= pl.recipe[1]; G.recipes.push(pl.recipe[0]); toast(`레시피 「${RECIPES[pl.recipe[0]].name}」 — 수첩에 끼워 넣었다`, 'page', 4200); }
+    else if (a === 'wear') { const w = WEAR.find(x => x.id === v); if (!w || G.coins < w.cost) return; G.coins -= w.cost; G.wear.push(w.id); toast(`${w.name} — 가방의 옷장에서 입을 수 있어요`, null, 4000); }
+    else if (a === 'contract') { if (G.coins < 120) return; G.coins -= 120; G.flags.contract = true; toast('농장과 손을 잡았다! 내일 아침부터 배달이 와요.', 'cabbage', 4200); }
+    else return;
+    Au.sfx('coin'); p.set(html()); refreshHUD();
+  });
+}
+async function travel() {
+  if (!opened()) return story.look.busstop();
+  if (G.servedToday || G.time >= 17 * 60) return UI.narr('막차가 끊겼다.\n내일 낮에 다시 오자.');
+  if (G.traveled) return UI.narr('오늘은 이미 다녀왔다.\n버스는 하루 한 번이면 족하다.');
+  const ids = Object.keys(PLACES);
+  const c = await UI.choose([...ids.map(id => `${PLACES[id].name} — 차비 ${PLACES[id].fare}닢${rank() < PLACES[id].rank ? ` (${PLACES[id].rank}성부터)` : ''}`), '그만둔다']);
+  if (c >= ids.length) return;
+  const pid = ids[c], pl = PLACES[pid];
+  if (rank() < pl.rank) return UI.narr('아직은 낯선 곳이다.\n식당 이름이 조금 더 알려지면 가 보자.');
+  if (G.coins < pl.fare) return UI.narr('차비가 모자라다.');
+  G.coins -= pl.fare; G.traveled = true; Au.sfx('door');
+  await UI.black(true);
+  await UI.narr(pl.arrive);
+  await openPlace(pid);
+  if (Math.random() < 0.4) { addItem(pl.find); await UI.narr(`돌아오는 길에 ${ITEMS[pl.find].name} 하나를 덤으로 얻었다.\n"순례 형님 생각나서 그래. 가져가."`); }
+  G.time = Math.max(G.time, 15 * 60);
+  await UI.narr('해가 기울 무렵, 솥골로 돌아왔다.');
+  await UI.black(false);
+}
+/* ── 마을을 오가는 사람들 ── */
+const walkers = [];
+const WAYPOINTS = [[2, 17], [43, 18], [22, 4], [23, 25], [28, 17], [15, 17], [22, 28], [6, 17], [30, 8], [36, 18], [12, 27], [26, 18]];
+function updateWalkers(dt) {
+  const want = G.time >= 19 * 60 ? 0 : Math.min(7, 3 + rank()) + (G.event === 'market' || G.event === 'tour' ? 3 : 0) - (G.event === 'rain' ? 2 : 0);
+  while (walkers.length < want) { const [x, y] = pickOne(WAYPOINTS); walkers.push({ spr: CHARS['guest' + Math.floor(Math.random() * GUEST_LOOKS.length)], x, y, px: x * T, py: y * T, dir: 'down', path: [], wait: Math.random() * 3, walkT: 0, sp: 22 + Math.random() * 12, idle: true }); }
+  if (walkers.length > want) walkers.length = Math.max(0, want);
+  for (const w of walkers) {
+    if (w.wait > 0) { w.wait -= dt; w.idle = true; continue; }
+    w.idle = false;
+    if (moveGuest(w, dt)) {
+      if (Math.random() < 0.3 && Math.abs(w.x - P.x) + Math.abs(w.y - P.y) < 9) floater(w.px + 8, w.py - 12, pickOne(WALKER_LINES), 'bubble', 2.4);
+      w.wait = 1 + Math.random() * 4; w.dir = 'down';
+      const [tx, ty] = pickOne(WAYPOINTS);
+      w.path = bfs(w.x, w.y, (x, y) => x === tx && y === ty, (x, y) => passable(x, y, true)) || [];
+    }
+  }
 }
 /* ── 장부: 평판·손맛·확장·도전 ── */
 function pickTraitPanel() {
@@ -578,6 +737,7 @@ const story = makeStory({
   tip: (t) => toast(t, null, 9000),
   shop: () => openShop(),
   workshop: () => openWorkshop(),
+  bank: () => openBank(),
   pickTrait: () => pickTrait(),
 });
 function checkProgress() {
@@ -596,6 +756,9 @@ function interact(th) {
     case 'look': if (th.id === 'cat') Au.sfx('pick'); return runScene(() => story.look[th.id]());
     case 'node': return harvest(th);
     case 'fish': return startFishing();
+    case 'bus': return runScene(travel);
+    case 'craft': return opened() ? openCraft() : runScene(() => UI.narr('빈 장독과 건조대.\n할머니가 쓰던 것이다.'));
+    case 'reqboard': return opened() ? openBoard() : runScene(() => UI.narr('마을 게시판.\n지금은 붙은 쪽지가 없다.'));
     case 'door':
       if (th.to === 'shop') return enterShop();
       if (th.to === 'village') return exitShop();
@@ -613,7 +776,7 @@ function interact(th) {
   }
 }
 function harvest(th) {
-  const n = th.n + (G.trait === 'thrift' ? 1 : 0) + (owns(th.id.startsWith('crop') ? 'garden' : 'basket') ? 1 : 0);
+  const n = th.n + (G.trait === 'thrift' ? 1 : 0) + (owns(th.id.startsWith('crop') ? 'garden' : 'basket') ? 1 : 0) + (G.event === 'harvest' && th.id.startsWith('crop') ? 1 : 0);
   G.taken[th.id] = 1; addItem(th.item, n); Au.sfx('pick');
   floater(th.x * T + 8, th.y * T, `+${n} ${itemName(th.item)}`);
   checkProgress();
@@ -725,7 +888,7 @@ function useSign() {
   runScene(async () => {
     await UI.narr(`오늘의 메뉴: ${menu.map(r => RECIPES[r].name).join(', ')}`);
     if (await UI.choose(['영업을 시작한다', '아직 준비 중']) !== 0) return;
-    svc = { left: Math.min(G.recipes.length + tables().length, 4 + rank() * 2), spawnT: 1.2, cust: [], served: 0, earned: 0, missed: 0, reserved: {}, usedNpc: {}, stuck: 0 };
+    svc = { left: Math.max(2, Math.min(G.recipes.length + tables().length, 4 + rank() * 2) + ({ rain: -2, market: 3, tour: 4 }[G.event] || 0)), spawnT: 1.2, cust: [], served: 0, earned: 0, missed: 0, reserved: {}, usedNpc: {}, stuck: 0 };
     G.time = Math.max(G.time, 17 * 60);
     Au.setMood('service'); Au.sfx('door'); toast('모락식당, 문 열었습니다!');
   });
@@ -743,11 +906,12 @@ function spawnGuest(rid, table) {
   const spr = npc ? CHARS[npc] : CHARS['guest' + Math.floor(Math.random() * GUEST_LOOKS.length)];
   const g = { spr, npc, x: 8, y: 9, px: 8 * T, py: 10 * T, dir: 'up', state: 'in', table, order: rid, patience: G.trait === 'warm' ? 130 : 90, t: 0, walkT: 0 };
   g.maxP = g.patience;
+  if (G.event === 'gourmet' && !svc.gourmet) { svc.gourmet = true; g.gourmet = true; }
   g.path = bfs(8, 9, (x, y) => x === table.x && y === table.y - 1, (x, y) => passable(x, y, true)) || [];
   table.cust = g; reserve(rid, 1); svc.cust.push(g); Au.sfx('door');
 }
 function moveGuest(g, dt) {
-  const tx = g.x * T, ty = g.y * T, sp = 52 * dt;
+  const tx = g.x * T, ty = g.y * T, sp = (g.sp || 52) * dt;
   const dx = tx - g.px, dy = ty - g.py, d = Math.hypot(dx, dy);
   if (d > sp) { g.px += dx / d * sp; g.py += dy / d * sp; g.walkT += dt; g.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); return false; }
   g.px = tx; g.py = ty;
@@ -776,7 +940,7 @@ function updateService(dt) {
     } else if (g.state === 'eat') {
       g.t -= dt;
       if (g.t <= 0) {
-        const pay = priceOf(g.order) + (g.tip ? (2 + rank()) * (G.trait === 'warm' ? 2 : 1) : 0);
+        const pay = priceOf(g.order) * (g.gourmet ? 3 : 1) + (g.tip ? (2 + rank()) * (G.trait === 'warm' ? 2 : 1) : 0);
         G.coins += pay; svc.earned += pay; G.stats.earned += pay; Au.sfx('coin');
         floater(g.px + 8, g.py - 10, `+${pay}닢`);
         leave(g);
@@ -794,8 +958,8 @@ function useTable(t) {
   g.state = 'eat'; g.t = 4.5; g.tip = g.patience > g.maxP / 2; t.dish = g.order;
   svc.served++; G.stats.served++; Au.sfx('heart');
   if (RECIPES[g.order].custom) G.stats.custom = (G.stats.custom || 0) + 1;
-  gainRep(g.tip ? 2 : 1); checkChallenges();
-  const lines = g.npc ? NPC_GUEST_LINES[g.npc] : GUEST_LINES;
+  gainRep((g.tip ? 2 : 1) + (g.gourmet && g.tip ? 5 : 0)); checkChallenges();
+  const lines = g.gourmet ? ['…훌륭하군요. 글로 남기겠습니다.'] : g.npc ? NPC_GUEST_LINES[g.npc] : GUEST_LINES;
   floater(g.px + 8, g.py - 12, lines[Math.floor(Math.random() * lines.length)], 'bubble', 2.6);
   refreshHUD();
 }
@@ -803,9 +967,11 @@ function endService() {
   const s = svc; svc = null; G.servedToday = true; G.time = 20 * 60;
   G.stats.best = Math.max(G.stats.best || 0, s.served);
   if (!s.missed && s.served >= 5) G.stats.perfect = (G.stats.perfect || 0) + 1;
+  let garn = 0; // 빚이 한도를 넘으면 수익의 30%가 자동 상환
+  if (G.bank.loan > loanLimit()) { garn = Math.min(G.bank.loan, Math.floor(s.earned * 0.3), G.coins); G.coins -= garn; G.bank.loan -= garn; }
   Au.setMood('night'); Au.sfx('done');
   runScene(async () => {
-    await openPanel('오늘의 영업 끝', `<p class="center">돌아온 빈 그릇 <b>${s.served}</b>개<br>번 돈 <b>${s.earned}</b>닢<br>식당 ${'★'.repeat(rank())} · 평판 ${G.rep}${s.missed ? `<br><small>기다리다 돌아간 손님 ${s.missed}명 — 괜찮아요, 내일 또 와요.</small>` : ''}</p>
+    await openPanel('오늘의 영업 끝', `<p class="center">돌아온 빈 그릇 <b>${s.served}</b>개<br>번 돈 <b>${s.earned}</b>닢<br>식당 ${'★'.repeat(rank())} · 평판 ${G.rep}${garn ? `<br><small>빚이 한도를 넘어 ${garn}닢이 마을금고로 들어갔어요.</small>` : ''}${s.missed ? `<br><small>기다리다 돌아간 손님 ${s.missed}명 — 괜찮아요, 내일 또 와요.</small>` : ''}</p>
       <p class="center"><button class="btn main" data-a="ok">수고했어요</button></p>`, (a, v, p) => p.close());
     if (G.step === 'first_open' && s.served > 0) await story.scenes.first_close();
     else toast('2층 계단으로 올라가면 하루를 마쳐요.');
@@ -818,10 +984,20 @@ async function sleep() {
   if (await UI.choose(['잠자리에 든다 (다음 날로)', '아직 할 일이 남았다']) !== 0) return;
   await UI.black(true); Au.sfx('sleep');
   collectLoose();
-  G.day++; G.time = 8 * 60; G.taken = {}; G.fishLeft = 5; G.servedToday = false; G.flags.credit = false;
+  G.day++; G.time = 8 * 60; G.taken = {}; G.servedToday = false; G.flags.credit = false; G.traveled = false; sunsetTold = false;
+  // 밤사이 일어나는 일: 이자, 가공 완성, 농장 배달, 새 의뢰, 오늘의 일
+  const B = G.bank, int = B.loan ? Math.ceil(B.loan * 0.03) : 0, gain = Math.min(20, Math.floor(B.dep * 0.01));
+  B.loan += int; B.dep += gain;
+  const cured = G.craft.filter(c => !c.ready).length; G.craft.forEach(c => { c.ready = true; });
+  if (G.flags.contract) { addItem('cabbage', 2); addItem('chili', 1); addItem('egg', 2); }
+  G.event = opened() && G.day >= 3 && Math.random() < 0.6 ? pickOne(Object.keys(EVENTS)) : null;
+  G.fishLeft = G.event === 'catch' ? 10 : 5;
+  ensureReqs();
+  const news = [int ? `빚 이자 +${int}닢` : '', gain ? `예금 이자 +${gain}닢` : '', cured ? `건조대에 ${cured}가지가 다 말랐다` : '', G.flags.contract ? '농장 배달이 문 앞에 와 있다' : ''].filter(Boolean).join(' · ');
   P.x = 13; P.y = 2; P.px = P.x * T; P.py = P.y * T; P.dir = 'down';
   Au.setMood('day');
-  await UI.narr(`${G.day}일째 아침.\n텃밭과 숲, 바다가 밤사이 다시 차올랐다.`);
+  await UI.narr(`${G.day}일째 아침.\n${G.event ? EVENTS[G.event].text : '텃밭과 숲, 바다가 밤사이 다시 차올랐다.'}`);
+  if (news) toast(news, null, 6000);
   if (G.step === 'sleep1') { await UI.black(false); await story.scenes.morning2(); }
   else await UI.black(false);
 }
@@ -949,6 +1125,7 @@ function update(dt) {
       if (G.time >= 17 * 60 && !sunsetTold && !G.servedToday && G.recipes.length) { sunsetTold = true; toast('해가 기울어요. 슬슬 저녁 장사를 준비해 볼까요?'); }
     }
     updatePlayer(dt);
+    if (map.name === 'village') updateWalkers(dt);
     if (map.name === 'shop') updateCookers(dt);
     if (svc) updateService(dt);
     saveT += dt; if (saveT > 20) { saveT = 0; save(); }
@@ -1004,12 +1181,13 @@ function render() {
   if (mode === 'play') {
     if (map === MAPS[G.map]) list.push({ k: P.py + T + 0.5, pl: true });
     if (svc && map.name === 'shop') for (const g of svc.cust) list.push({ k: g.py + T + 0.4, g });
+    if (map.name === 'village') for (const w of walkers) list.push({ k: w.py + T + 0.3, g: w });
   }
   list.sort((a, b) => a.k - b.k);
 
   for (const d of list) {
     if (d.pl) { drawChar(CHARS.player, P.dir, P.moving, P.walkT, Math.round(P.px), Math.round(P.py)); continue; }
-    if (d.g) { const g = d.g, sit = g.state === 'wait' || g.state === 'eat'; drawChar(g.spr, g.dir, !sit, g.walkT, Math.round(g.px), Math.round(g.py), sit); continue; }
+    if (d.g) { const g = d.g, sit = g.state === 'wait' || g.state === 'eat'; drawChar(g.spr, g.dir, !sit && !g.idle, g.walkT, Math.round(g.px), Math.round(g.py), sit); continue; }
     const th = d.th;
     if (th.type === 'npc') {
       const turn = Math.floor(tAnim / 3 + th.x) % 5 === 0;
@@ -1044,6 +1222,7 @@ function render() {
       if (svc) for (const g of svc.cust) if (g.state === 'wait') {
         const bx = Math.round(g.px) - 1, by = Math.round(g.py) - 30;
         bubbleBox(bx, by, 18, 17); drawIcon(g.order, bx + 3, by + 2);
+        if (g.gourmet) drawIcon('coin', bx + 12, by - 7);
         const pr = g.patience / g.maxP;
         bar(bx + 3, by + 14, 12, pr, pr > 0.5 ? '#5fa644' : pr > 0.22 ? '#f2a03c' : '#c4553f');
       } else if (g.state === 'eat') drawIcon('heart', g.px + 2, g.py - 22 + Math.sin(tAnim * 6));
@@ -1052,6 +1231,10 @@ function render() {
     if (q && map.name === 'village' && !(G.step === 'gather' && G.flags.gift)) {
       const n = map.things.find(t => t.type === 'npc' && t.id === q);
       if (n) drawIcon('bang', n.x * T + 2, n.y * T - 22 + Math.round(Math.sin(tAnim * 5) * 2));
+    }
+    if (map.name === 'village' && opened()) {
+      if (G.reqs.some(r => !r.done && inv(r.item) >= r.n)) drawIcon('bang', 26 * T + 2, 19 * T - 26 + Math.round(Math.sin(tAnim * 5) * 2));
+      if (G.craft.some(c => c.ready)) drawIcon('bang', 32 * T + 2, 15 * T - 24 + Math.round(Math.sin(tAnim * 5) * 2));
     }
     if (G.step === 'cauldron' && map.name === 'shop') drawIcon('bang', 11 * T + 10, -2 + Math.round(Math.sin(tAnim * 5) * 2));
     if (G.step === 'enter_shop' && map.name === 'village') drawIcon('bang', 28 * T + 2, 10 * T - 8 + Math.round(Math.sin(tAnim * 5) * 2));
@@ -1071,6 +1254,10 @@ function render() {
   // 시간에 따른 빛
   if (G && mode === 'play' && map.name === 'village') {
     const t = G.time / 60;
+    if (G.event === 'rain') {
+      ctx.fillStyle = 'rgba(70,90,120,.2)'; ctx.fillRect(0, 0, VW, VH); ctx.fillStyle = 'rgba(220,235,255,.55)';
+      for (let i = 0; i < 70; i++) { const x = (i * 53 + tAnim * 60) % (VW + 20) - 10, y = (i * 97 + tAnim * 260) % (VH + 10) - 5; ctx.fillRect(Math.round(x), Math.round(y), 1, 4); }
+    }
     if (t >= 19) { ctx.fillStyle = 'rgba(28,36,92,.38)'; ctx.fillRect(0, 0, VW, VH); }
     else if (t > 15.5) { ctx.fillStyle = `rgba(255,140,60,${Math.min(0.2, (t - 15.5) * 0.1)})`; ctx.fillRect(0, 0, VW, VH); }
   }
@@ -1081,9 +1268,14 @@ function startGame(state, isNew) {
   G = state; if (!G.stats) G.stats = { served: 0, earned: 0 };
   // 예전 저장에도 경영 요소를 채워 넣어요
   G.up = G.up || {}; G.rep = G.rep || 0; G.custom = G.custom || []; G.done = G.done || {}; if (G.trait === undefined) G.trait = null;
+  G.bank = G.bank || { dep: 0, loan: 0 }; G.craft = G.craft || []; G.wear = G.wear || []; G.event = G.event || null; G.traveled = !!G.traveled;
+  G.look = G.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
   for (const k of Object.keys(RECIPES)) if (RECIPES[k].custom) delete RECIPES[k];
   G.custom.forEach(registerCustom);
   if (!G.rep && G.stats.served) G.rep = G.stats.served;
+  if (!G.reqs) G.reqs = [];
+  ensureReqs();
+  applyLook(); walkers.length = 0;
   mode = 'play'; svc = null;
   map = MAPS[G.map] || MAPS.village;
   P.x = G.x; P.y = G.y; P.px = P.x * T; P.py = P.y * T; P.dir = 'down'; P.hands = null; P.moving = false; P.path = null;
@@ -1115,6 +1307,6 @@ function boot() {
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
+  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
 }
 boot();

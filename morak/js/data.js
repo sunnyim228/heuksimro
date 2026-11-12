@@ -13,6 +13,15 @@ export const ITEMS = {
   clam: { name: '조개' },
   miyeok: { name: '미역' },
   fish: { name: '생선' },
+  // 다른 고장에서 구하는 것
+  cabbage: { name: '배추', chop: true },
+  chili: { name: '고추' },
+  sesame: { name: '참기름' },
+  abalone: { name: '전복' },
+  // 건조대·장독에서 가공한 것
+  dried_mushroom: { name: '말린 표고' },
+  mu_dried: { name: '무말랭이' },
+  dried_fish: { name: '반건조 생선' },
 };
 export const SHOP_LIST = ['rice', 'egg', 'tofu', 'doenjang'];
 
@@ -28,6 +37,12 @@ export const RECIPES = {
   grilled_fish: { name: '생선구이', cooker: 'pan', ing: ['fish', 'mu_c'], price: 18, from: '한 선장이 맡아 둔 장', memo: '뒤집는 건 딱 한 번.' },
   gukbap: { name: '모락국밥', cooker: 'cauldron', ing: ['rice', 'mu_c', 'mushroom_c', 'doenjang'], price: 25, from: '마을 사람들의 기억', memo: '무. 말아 낸 밥. 말린 버섯. 된장은 딱 한 숟갈. — 파는 넣지 않는다.' },
 };
+Object.assign(RECIPES, {
+  baechujeon: { name: '배추전', cooker: 'pan', ing: ['cabbage_c', 'egg'], price: 14, from: '윗마을 농장 아주머니', memo: '줄기는 칼등으로 두드려 편다.' },
+  spicy_fish: { name: '매운 생선조림', cooker: 'pot', ing: ['fish', 'mu_c', 'chili'], price: 24, from: '읍내 장터 반찬가게', memo: '무가 생선보다 맛있어야 한다.' },
+  abalone_juk: { name: '전복죽', cooker: 'pot', ing: ['rice', 'abalone', 'sesame'], price: 32, from: '건넛섬 해녀의 집', memo: '쌀알이 퍼질 때까지 젓는 걸 멈추지 않는다.' },
+});
+export const TRAVEL_ORDER = ['baechujeon', 'spicy_fish', 'abalone_juk'];
 export const RECIPE_ORDER = ['egg_rice', 'doenjang_jjigae', 'radish_soup', 'miyeok_guk', 'gamjajeon', 'mushroom_rice', 'namul_rice', 'grilled_fish', 'gukbap'];
 export const COOKER_NAME = { pan: '팬', pot: '냄비', cauldron: '가마솥' };
 
@@ -77,7 +92,7 @@ export const NPC_GUEST_LINES = {
 };
 
 /* ───────── 경영·성장 ───────── */
-export const VALUE = { rice: 2, egg: 2, tofu: 3, doenjang: 4, pa: 2, mu: 2, gamja: 2, mushroom: 3, namul: 3, clam: 3, miyeok: 3, fish: 6 };
+export const VALUE = { rice: 2, egg: 2, tofu: 3, doenjang: 4, pa: 2, mu: 2, gamja: 2, mushroom: 3, namul: 3, clam: 3, miyeok: 3, fish: 6, cabbage: 3, chili: 3, sesame: 5, abalone: 9, dried_mushroom: 8, mu_dried: 6, dried_fish: 13 };
 
 // 나의 손맛: 주인공의 특성
 export const TRAITS = {
@@ -102,6 +117,7 @@ export const UPGRADES = [
   { id: 'basket', name: '큰 바구니', desc: '숲·바닷가 채집 +1', cost: 90, rank: 2 },
   { id: 'stove', name: '센 화구', desc: '모든 조리 시간 30% 단축', cost: 160, rank: 3 },
   { id: 'table5', name: '다섯 번째 식탁', desc: '가게가 꽉 차요', cost: 180, rank: 3, need: 'table4' },
+  { id: 'rack', name: '건조대 늘리기', desc: '가공 자리 2칸 → 4칸', cost: 100, rank: 2 },
 ];
 
 // 도전 과제 (달성하면 바로 보상)
@@ -113,5 +129,63 @@ export const CHALLENGES = [
   { id: 'busy', name: '북적북적', desc: '하루에 8그릇 대접', reward: 60, test: G => (G.stats.best || 0) >= 8 },
   { id: 'rich', name: '든든한 금고', desc: '누적 500닢 벌기', reward: 80, test: G => G.stats.earned >= 500 },
   { id: 'pages', name: '수첩을 다시 채우다', desc: '할머니의 레시피 9장 모두 모으기', reward: 100, test: G => RECIPE_ORDER.every(r => G.recipes.includes(r)) },
+  { id: 'helper', name: '마을의 손', desc: '게시판 의뢰 10건 해결', reward: 60, test: G => (G.stats.req || 0) >= 10 },
+  { id: 'debtfree', name: '빚 없는 아침', desc: '대출을 받았다가 모두 갚기', reward: 50, test: G => !!G.flags.borrowed && G.bank.loan === 0 },
   { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
 ];
+
+/* ───────── 가공 · 다른 고장 · 옷 · 오늘의 일 · 의뢰 ───────── */
+// 건조대·장독: 재료를 넣어 두면 하룻밤 뒤에 완성
+export const CRAFTS = [
+  { id: 'dried_mushroom', from: { mushroom: 2 }, how: '볕에 말린다' },
+  { id: 'mu_dried', from: { mu: 2 }, how: '썰어서 널어 둔다' },
+  { id: 'dried_fish', from: { fish: 1 }, how: '바닷바람에 건다' },
+];
+
+// 버스를 타고 다녀오는 곳
+export const PLACES = {
+  farm: { name: '윗마을 농장', fare: 6, rank: 1, find: 'cabbage',
+    arrive: '버스로 이십 분. 고갯마루를 넘자 배추밭이 끝도 없이 펼쳐졌다.\n"모락식당? 아이고, 순례 형님네!"',
+    goods: [['cabbage', 3], ['chili', 3], ['egg', 1]], recipe: ['baechujeon', 40] },
+  town: { name: '읍내 장터', fare: 10, rank: 2, find: 'sesame',
+    arrive: '읍내 오일장. 기름집 깨 볶는 냄새가 골목을 채운다.\n없는 게 없고, 사람도 많다.',
+    goods: [['sesame', 6], ['chili', 3], ['tofu', 2], ['doenjang', 3]], recipe: ['spicy_fish', 60] },
+  island: { name: '건넛섬', fare: 18, rank: 3, find: 'abalone',
+    arrive: '배로 사십 분. 해녀들의 숨비소리가 먼저 마중을 나왔다.\n"금자 언니 아는 사람이면 우리 사람이지."',
+    goods: [['abalone', 10], ['miyeok', 2], ['clam', 2]], recipe: ['abalone_juk', 90] },
+};
+
+// 옷장: free는 처음부터, 나머지는 각 고장에서 구해요
+export const HAIR_COLORS = ['#7a4b2e', '#3b2a25', '#c98a5c', '#e6c15a', '#b06a8a', '#d9d6d0'];
+export const HAIR_STYLES = [['short', '짧은 머리'], ['long', '긴 머리'], ['bun', '올림머리'], ['pig', '양갈래']];
+export const WEAR = [
+  { id: 'shirt_white', kind: 'shirt', col: '#f4f1e6', name: '흰 조리복', free: true },
+  { id: 'shirt_sky', kind: 'shirt', col: '#8fb9cf', name: '하늘색 셔츠', free: true },
+  { id: 'shirt_mint', kind: 'shirt', col: '#9fd27a', name: '풀색 셔츠', free: true },
+  { id: 'shirt_work', kind: 'shirt', col: '#5a8a4b', name: '농장 작업복', cost: 30, at: 'farm' },
+  { id: 'shirt_red', kind: 'shirt', col: '#c4553f', name: '장터 빨간 셔츠', cost: 35, at: 'town' },
+  { id: 'shirt_plum', kind: 'shirt', col: '#9a5fa8', name: '양장점 자주 셔츠', cost: 45, at: 'town' },
+  { id: 'shirt_navy', kind: 'shirt', col: '#2f4670', name: '섬 남색 셔츠', cost: 40, at: 'island' },
+  { id: 'hat_none', kind: 'hat', hat: 'none', col: '#d8caa9', name: '모자 없음', free: true },
+  { id: 'hat_band', kind: 'hat', hat: 'band', col: '#e25c5c', name: '빨간 머리띠', free: true },
+  { id: 'hat_straw', kind: 'hat', hat: 'straw', col: '#ecd08a', name: '밀짚모자', cost: 30, at: 'farm' },
+  { id: 'hat_beanie', kind: 'hat', hat: 'beanie', col: '#5b9fc7', name: '털모자', cost: 40, at: 'town' },
+  { id: 'hat_towel', kind: 'hat', hat: 'towel', col: '#f7f3e6', name: '해녀 수건', cost: 30, at: 'island' },
+  { id: 'hat_cap', kind: 'hat', hat: 'cap', col: '#2f4670', name: '선장 모자', cost: 60, at: 'island' },
+];
+
+// 오늘의 일: 아침마다 가끔 생기는 변수
+export const EVENTS = {
+  rain: { name: '비 오는 날', text: '빗소리에 눈을 떴다.\n손님은 줄겠지만, 이런 날엔 기름 냄새가 약이다. (손님 -2, 팬 요리 값 +30%)' },
+  market: { name: '장날', text: '오늘은 솥골 장날.\n길에 사람이 많다. (손님 +3)' },
+  tour: { name: '관광버스', text: '정류장에 낯선 버스가 섰다.\n단체 손님이 온다는 소문이다. (손님 +4)' },
+  catch: { name: '풍어', text: '선장이 그물을 털며 웃는다.\n오늘은 고기가 문다. (낚시 10번까지)' },
+  harvest: { name: '풍작', text: '밤사이 단비가 지나갔다.\n텃밭이 유난히 실하다. (텃밭 수확 +1)' },
+  pricey: { name: '물가 오름', text: '만물상 앞에 한숨 소리.\n읍내 도매값이 올랐단다. (만물상 값 +1)' },
+  sale: { name: '떨이 장사', text: '이장님이 창고를 정리한다.\n오늘은 싸게 판단다. (만물상 값 -1)' },
+  gourmet: { name: '미식가 방문', text: '읍내 신문에 맛집 글을 쓰는 사람이\n오늘 솥골에 온다는 소문이다. (첫 손님이 값 3배, 빨리 내면 평판 +5)' },
+};
+
+export const REQ_PEOPLE = ['민박집 할머니', '우체부 아저씨', '방앗간 아주머니', '분교 선생님', '등대지기', '약초꾼 할아버지', '소리', '금자 할머니', '도윤'];
+export const REQ_ITEMS = ['pa', 'mu', 'gamja', 'mushroom', 'namul', 'clam', 'miyeok'];
+export const WALKER_LINES = ['오늘 저녁은 모락식당 갈까.', '바람이 좋네.', '텃밭 파가 실하네.', '게시판에 뭐 붙었나?', '버스 올 시간인데.', '어디서 밥 냄새가…', '순례 할매 손주라며?', '날이 참 좋다.'];

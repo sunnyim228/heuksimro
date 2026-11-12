@@ -268,6 +268,16 @@ const ICON_DRAW = {
   clam: g => { ell(g, '#ead4b2', 6, 6, 4, 3); R(g, '#c8aa82', 3, 5, 1, 3); R(g, '#c8aa82', 6, 4, 1, 4); R(g, '#c8aa82', 9, 5, 1, 3); R(g, '#b5946a', 5, 10, 3, 1); R(g, '#fff4dd', 4, 4, 2, 1); },
   miyeok: g => { R(g, '#2f6b4f', 3, 1, 2, 3); R(g, '#2f6b4f', 4, 4, 2, 3); R(g, '#2f6b4f', 3, 7, 2, 3); R(g, '#479472', 7, 2, 2, 2); R(g, '#479472', 8, 4, 2, 3); R(g, '#479472', 7, 7, 2, 3); R(g, '#5fb08a', 4, 2, 1, 1); },
   fish: g => { ell(g, '#84adcc', 5, 6, 4, 2); R(g, '#d3e3ee', 2, 7, 6, 1); R(g, '#5f89aa', 9, 5, 1, 3); R(g, '#5f89aa', 10, 4, 1, 5); R(g, '#2b2b2b', 3, 5); R(g, '#5f89aa', 5, 3, 3, 1); },
+  cabbage: g => { ell(g, '#bfe08a', 6, 6, 4, 4); ell(g, '#dff0b4', 6, 7, 2, 3); R(g, '#f4f7e0', 6, 4, 1, 6); R(g, '#8fc45a', 2, 5, 1, 3); R(g, '#8fc45a', 10, 5, 1, 3); },
+  chili: g => { for (let i = 0; i < 7; i++) R(g, '#d8412f', 2 + i, 9 - i, 2, 2); R(g, '#f07a5a', 4, 7, 2, 1); R(g, '#5fa644', 9, 1, 2, 2); R(g, '#5fa644', 10, 0, 1, 1); },
+  sesame: g => { R(g, '#d9a13c', 3, 4, 6, 6); R(g, '#b9822a', 8, 4, 1, 6); R(g, '#f0c468', 4, 5, 1, 4); R(g, '#d9a13c', 5, 2, 2, 2); R(g, '#4a3328', 4, 1, 4, 1); R(g, '#fbf3dc', 4, 7, 3, 2); },
+  abalone: g => { ell(g, '#7d8a94', 6, 6, 4, 3); ell(g, '#d9e6e0', 6, 7, 3, 1); R(g, '#b8d8d0', 5, 6, 3, 1); R(g, '#5d6a74', 3, 4, 1, 1); R(g, '#5d6a74', 5, 3, 1, 1); R(g, '#5d6a74', 7, 3, 1, 1); R(g, '#f3c9c0', 7, 7, 1, 1); },
+  dried_mushroom: g => { ell(g, '#6b4129', 6, 4, 4, 2); R(g, '#8c5d3c', 3, 3, 2, 1); R(g, '#8c5d3c', 7, 4, 2, 1); R(g, '#d8c39a', 5, 7, 3, 3); R(g, '#4a2d1b', 2, 6, 9, 1); R(g, '#b9a37c', 7, 7, 1, 3); },
+  mu_dried: g => { R(g, '#ead9a8', 2, 2, 2, 7); R(g, '#d8c48c', 3, 8, 3, 2); R(g, '#ead9a8', 6, 3, 2, 7); R(g, '#d8c48c', 7, 2, 3, 2); R(g, '#f4e8c4', 2, 3, 1, 3); R(g, '#f4e8c4', 6, 5, 1, 3); },
+  dried_fish: g => { ell(g, '#c9a36a', 5, 6, 4, 2); R(g, '#e3c690', 2, 6, 5, 1); R(g, '#a57f4c', 9, 5, 1, 3); R(g, '#a57f4c', 10, 4, 1, 5); R(g, '#2b2b2b', 3, 5); R(g, '#a57f4c', 5, 5, 1, 3); R(g, '#a57f4c', 7, 5, 1, 3); R(g, '#8a7a6a', 6, 1, 1, 3); },
+  baechujeon: g => { plate(g); ell(g, '#dfe39a', 6, 7, 3, 2); R(g, '#f4f7e0', 5, 6, 3, 1); R(g, '#c78f3c', 3, 7); R(g, '#c78f3c', 9, 8); R(g, '#8fc45a', 7, 8, 2, 1); },
+  spicy_fish: g => bowl(g, '#4d4038', '#c4553f', [[4, 5, '#84adcc', 2], [7, 5, '#f8f5ec'], [6, 6, '#f8f5ec', 2], [8, 6, '#d8412f']]),
+  abalone_juk: g => bowl(g, '#f1e9d6', '#f3ecc8', [[4, 5, '#7d8a94', 2], [7, 5, '#d9a13c'], [6, 6, '#b8d8d0', 2]]),
   // 요리
   egg_rice: g => { plate(g); ell(g, '#f4dc86', 6, 6, 3, 2); R(g, '#fff3c2', 5, 5, 2, 1); R(g, '#5fa644', 4, 6); R(g, '#5fa644', 7, 5); R(g, '#5fa644', 8, 7); R(g, '#f0a13c', 6, 7); },
   doenjang_jjigae: g => bowl(g, '#5a4a44', '#b9793f', [[4, 5, '#fdfaf0', 2], [7, 5, '#5fa644'], [8, 6, '#fdfaf0'], [5, 6, '#5fa644']]),
@@ -286,7 +296,7 @@ const ICON_DRAW = {
   page: g => { R(g, '#fbf3dc', 3, 1, 7, 10); R(g, '#e3d6b4', 9, 1, 1, 10); R(g, '#a8794f', 4, 3, 4, 1); R(g, '#a8794f', 4, 5, 4, 1); R(g, '#a8794f', 4, 7, 3, 1); },
   rod: g => { for (let i = 0; i < 9; i++) R(g, '#a5754a', 2 + i, 10 - i, 1, 1); R(g, '#ddd', 10, 2, 1, 5); R(g, '#e25c5c', 9, 7, 2, 2); },
 };
-const MAINCOL = { rice: '#fbf6e8', egg: '#f4dc86', tofu: '#fdfaf0', doenjang: '#b9793f', pa: '#5fa644', mu: '#f8f5ec', gamja: '#ecc56c', mushroom: '#a9683f', namul: '#7cc05a', clam: '#ead4b2', miyeok: '#2f6b4f', fish: '#84adcc' };
+const MAINCOL = { rice: '#fbf6e8', egg: '#f4dc86', tofu: '#fdfaf0', doenjang: '#b9793f', pa: '#5fa644', mu: '#f8f5ec', gamja: '#ecc56c', mushroom: '#a9683f', namul: '#7cc05a', clam: '#ead4b2', miyeok: '#2f6b4f', fish: '#84adcc', cabbage: '#bfe08a', chili: '#d8412f', sesame: '#d9a13c', abalone: '#b8d8d0', dried_mushroom: '#6b4129', mu_dried: '#ead9a8', dried_fish: '#c9a36a' };
 // 나만의 요리: 재료 색으로 그릇을 그려요 (남색 그릇/남색 테두리가 '내 요리' 표시)
 export function registerDish(id, cooker, ings) {
   const c = ings.map(i => MAINCOL[i.replace(/_c$/, '')] || '#cccccc'), c1 = c[1] || c[0], c2 = c[2] || c1;
@@ -308,7 +318,7 @@ export function itemIcon(id) {
   } else c = icon(ICON_DRAW[id] || ICON_DRAW.dots);
   return (iconCache[id] = c);
 }
-const CHOP_COL = { pa: ['#5fa644', '#f6f4e4'], mu: ['#f8f5ec', '#dfd9c8'], gamja: ['#f2dea0', '#cfa56c'], tofu: ['#fdfaf0', '#e4dccb'], mushroom: ['#a9683f', '#f1e5cd'], namul: ['#7cc05a', '#4f9a3a'] };
+const CHOP_COL = { pa: ['#5fa644', '#f6f4e4'], mu: ['#f8f5ec', '#dfd9c8'], gamja: ['#f2dea0', '#cfa56c'], tofu: ['#fdfaf0', '#e4dccb'], mushroom: ['#a9683f', '#f1e5cd'], namul: ['#7cc05a', '#4f9a3a'], cabbage: ['#bfe08a', '#f4f7e0'] };
 const urlCache = {};
 export function iconURL(id) {
   if (!urlCache[id]) urlCache[id] = itemIcon(id).toDataURL();
@@ -352,6 +362,18 @@ export function buildSprites() {
   sprite('boat', 34, 16, g => { R(g, '#e9e2d0', 2, 3, 30, 4); R(g, '#c9553f', 3, 7, 28, 3); R(g, '#a8402e', 5, 10, 24, 2); R(g, '#8c5d3c', 6, 2, 22, 1); R(g, '#f7f3e6', 3, 3, 28, 1); R(g, '#8c5d3c', 12, 4, 2, 3); R(g, '#8c5d3c', 20, 4, 2, 3); });
   sprite('stump', 14, 12, g => { R(g, '#a5754a', 2, 4, 10, 7); ell(g, '#e3c08d', 7, 4, 5, 2); R(g, '#c29a68', 6, 4, 3, 1); R(g, '#7a5334', 2, 10, 10, 1); });
   sprite('swing', 22, 28, g => { R(g, '#8c5d3c', 2, 1, 2, 26); R(g, '#8c5d3c', 18, 1, 2, 26); R(g, '#8c5d3c', 1, 1, 20, 2); R(g, '#d8caa9', 7, 3, 1, 14); R(g, '#d8caa9', 14, 3, 1, 14); R(g, '#e25c5c', 6, 17, 10, 2); });
+  sprite('jars', 30, 26, g => {
+    R(g, '#8c5d3c', 1, 2, 2, 23); R(g, '#8c5d3c', 27, 2, 2, 23); R(g, '#a5754a', 1, 3, 28, 2);
+    for (const [x, c] of [[5, '#6b4129'], [10, '#ead9a8'], [15, '#c9a36a'], [20, '#6b4129'], [24, '#ead9a8']]) { R(g, '#d8caa9', x, 5, 1, 2); R(g, c, x - 1, 7, 3, 4); }
+    ell(g, '#7a4b33', 9, 19, 5, 5); ell(g, '#8f5b3f', 8, 17, 2, 2); R(g, '#5a3524', 5, 13, 9, 2);
+    ell(g, '#7a4b33', 21, 20, 4, 4); R(g, '#5a3524', 18, 15, 7, 2); R(g, '#8f5b3f', 19, 18, 2, 2);
+  });
+  sprite('noticeboard', 26, 28, g => {
+    R(g, '#8c5d3c', 3, 6, 2, 21); R(g, '#8c5d3c', 21, 6, 2, 21); R(g, '#b9553f', 0, 1, 26, 4); R(g, '#d06a52', 1, 1, 24, 1);
+    R(g, '#c99562', 2, 5, 22, 14); R(g, '#a5754a', 2, 18, 22, 1);
+    R(g, '#fbf3dc', 4, 7, 6, 7); R(g, '#f7dd7e', 11, 8, 5, 6); R(g, '#fbf3dc', 17, 7, 5, 8); R(g, '#e25c5c', 6, 7, 1, 1); R(g, '#e25c5c', 13, 8, 1, 1); R(g, '#e25c5c', 19, 7, 1, 1);
+    R(g, '#a8794f', 5, 9, 4, 1); R(g, '#a8794f', 5, 11, 3, 1); R(g, '#a8794f', 18, 10, 3, 1); R(g, '#a8794f', 18, 12, 3, 1);
+  });
   // 작물·채집물
   sprite('crop_pa', 14, 14, g => { for (const x of [3, 6, 9]) { R(g, '#5fa644', x, 2, 2, 9); R(g, '#7cc05a', x, 2, 1, 6); R(g, '#f6f4e4', x, 10, 2, 2); } R(g, '#5fa644', 2, 1, 1, 2); R(g, '#5fa644', 11, 1, 1, 3); });
   sprite('crop_mu', 14, 14, g => { ell(g, '#f8f5ec', 7, 10, 3, 2); R(g, '#c9e3a6', 5, 8, 5, 1); for (const [x, y, h] of [[3, 2, 6], [6, 1, 7], [9, 2, 6], [11, 4, 4], [1, 4, 4]]) R(g, x % 2 ? '#5fa644' : '#7cc05a', x, y, 2, h); });

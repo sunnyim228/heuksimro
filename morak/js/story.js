@@ -84,6 +84,7 @@ export function makeStory(A) {
       await A.say('ijang', '아, 장사가 잘돼서 식탁이나 화구가 모자라거든 숲속 도윤이를 찾아가라. 손재주가 좋다. 가게 살림은 「장부」에 적어 두고.');
       await A.say('ijang', '바닷가 금자 누님부터 가 봐라. 순례 누님 된장찌개 못 먹은 지 삼 년이라고 노래를 불러. 두부랑 된장은 우리 가게에 있다!');
       A.setStep('q_geumja');
+      A.tip('마을이 조금 열렸어요.\n· 식당 옆 건조대: 재료를 말려 비싼 재료로\n· 길가 게시판: 주민들의 의뢰\n· 버스 정류장: 다른 고장 다녀오기\n· 이장님: 마을금고(예금·대출)');
     },
 
     /* ── 금자 ── */
@@ -212,8 +213,10 @@ export function makeStory(A) {
           return;
         }
       }
-      const c = await A.choose(['물건을 산다', '이야기한다']);
+      const opts = after('sleep1') ? ['물건을 산다', '마을금고 (예금·대출)', '이야기한다'] : ['물건을 산다', '이야기한다'];
+      const c = await A.choose(opts);
       if (c === 0) return A.shop();
+      if (opts.length === 3 && c === 1) return A.bank();
       if (s === 'q_ijang2') return A.say('ijang', '응? 한 선장이 뭐라고 했다고? …허허, 맨입으로는 말 못 한다. 그 영감이 잡은 생선 맛이 그립구먼.');
       if (s === 'cauldron' || s === 'gukbap') return A.say('ijang', '가마솥은 누님이 제일 아끼던 거다. 네가 불을 지피는 걸 보면 좋아하실 게다.');
       if (s === 'epilogue') return A.say('ijang', pick(['정희가 다녀갔다며? …잘됐다. 참 잘됐어.', '요즘 마을에 밥 냄새가 돌아서 살맛이 난다. 허허.', '국밥 한 그릇 하러 저녁에 들르마!']));
