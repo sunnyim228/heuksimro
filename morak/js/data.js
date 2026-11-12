@@ -131,6 +131,7 @@ export const CHALLENGES = [
   { id: 'pages', name: '수첩을 다시 채우다', desc: '할머니의 레시피 9장 모두 모으기', reward: 100, test: G => RECIPE_ORDER.every(r => G.recipes.includes(r)) },
   { id: 'helper', name: '마을의 손', desc: '게시판 의뢰 10건 해결', reward: 60, test: G => (G.stats.req || 0) >= 10 },
   { id: 'debtfree', name: '빚 없는 아침', desc: '대출을 받았다가 모두 갚기', reward: 50, test: G => !!G.flags.borrowed && G.bank.loan === 0 },
+  { id: 'reader', name: '얼굴만 봐도 안다', desc: '사정 있는 손님에게 딱 맞는 음식을 10번', reward: 60, test: G => (G.stats.fit || 0) >= 10 },
   { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
 ];
 
@@ -199,3 +200,64 @@ export const SHARE_LINES = {
   captain: '…앉아라. 배 위에서도 밥은 둘러앉아 먹는 법이다.',
 };
 export const NPC_DONE = { ijang: 'sleep1', geumja: 'q_geumja', sori: 'q_sori', doyun: 'q_doyun', captain: 'q_captain' };
+
+/* ───────── 요리의 성격과 손님의 사정 ───────── */
+export const TAG_NAME = { soup: '따뜻한 국물', light: '속 편한', hearty: '든든한', crispy: '고소한 기름맛', sea: '바다 맛', spicy: '매운맛' };
+const TAGS = {
+  egg_rice: ['hearty', 'crispy'], doenjang_jjigae: ['soup', 'hearty'], radish_soup: ['soup', 'light'], miyeok_guk: ['soup', 'sea', 'light'],
+  gamjajeon: ['crispy'], mushroom_rice: ['hearty'], namul_rice: ['light'], grilled_fish: ['sea', 'hearty'], gukbap: ['soup', 'hearty'],
+  baechujeon: ['crispy', 'light'], spicy_fish: ['spicy', 'sea'], abalone_juk: ['light', 'sea'],
+};
+for (const id in TAGS) RECIPES[id].tags = TAGS[id];
+// 나만의 요리는 도구와 재료로 성격이 정해져요
+export function tagsFor(cooker, ing) {
+  const b = ing.map(baseOf), t = new Set([cooker === 'pan' ? 'crispy' : 'soup']);
+  if (b.includes('rice')) t.add('hearty');
+  if (b.includes('chili')) t.add('spicy');
+  if (b.some(x => ['clam', 'miyeok', 'fish', 'abalone', 'dried_fish'].includes(x))) t.add('sea');
+  if (b.some(x => ['tofu', 'mu', 'namul', 'cabbage', 'mu_dried'].includes(x)) && !b.includes('chili')) t.add('light');
+  return [...t];
+}
+// 요리 이름 대신 사정을 말하는 손님
+export const MOODS = [
+  { tag: 'soup', line: '감기 기운이 있어서요… 뭐가 좋을까요.', ok: '아… 몸이 풀리네요. 딱 이게 필요했어요.' },
+  { tag: 'soup', line: '오늘 좀 울적해서요. 알아서 주세요.', ok: '…따뜻하다. 좀 살 것 같아요.' },
+  { tag: 'light', line: '속이 영 안 좋아요. 부담 없는 걸로요.', ok: '속이 편안해지네요. 고마워요.' },
+  { tag: 'light', line: '어제 과음을 해서… 살려 주세요.', ok: '하아, 살았다. 이 집 단골 할게요.' },
+  { tag: 'hearty', line: '종일 굶었어요. 뭐든 든든한 걸로!', ok: '이제야 사람 됐네요. 배가 든든해요!' },
+  { tag: 'hearty', line: '오후에 밭일이 남아서요. 힘나는 걸로 주세요.', ok: '이거면 저녁까지 거뜬하겠어요.' },
+  { tag: 'crispy', line: '기름 냄새가 당기는 날이네요.', ok: '바삭한 소리부터 맛있네요. 이거지!' },
+  { tag: 'sea', line: '바다 보러 왔는데 바다 맛을 못 봤어요.', ok: '아, 이게 솥골 바다 맛이군요.' },
+  { tag: 'sea', line: '고향이 섬이에요. 그 맛이 그리워서요.', ok: '…어머니 생각이 나네요. 잘 먹었습니다.' },
+  { tag: 'spicy', line: '정신이 번쩍 들게 매운 거 없을까요?', ok: '후아, 땀 난다! 속이 뻥 뚫리네요.' },
+];
+export const MOOD_MISS = ['…네, 잘 먹을게요.', '음, 이것도 괜찮네요.', '아… 네. 감사합니다.'];
+
+// 같이 밥을 먹은 횟수가 쌓이면 들려주는 이야기 (2·4·6번째)
+export const BOND_STORIES = {
+  ijang: [
+    '누님이 처음 이 식당 열던 날, 손님은 나 하나였다. 국밥 한 그릇에 깍두기를 세 번 더 줬지. 그날부터 삼십 년이야.',
+    "정희 태워다 준 날, 돌아와서 누님 얼굴을 못 봤어. 근데 누님이 먼저 그러더라. '덕수야, 밥은 먹었냐.'",
+    "누님 가시기 전날에도 이렇게 같이 먹었다. '내 손주 오거든 굶기지 마라' 하시더라. …굶기긴, 내가 얻어먹고 있네. 허허.",
+  ],
+  geumja: [
+    "물질 처음 배울 때 무서워서 울었어. 언니가 뭍에서 불 피워 놓고 기다렸지. '나오면 밥 있다.' 그 한마디에 들어갔어.",
+    '내 영감이 바다에서 못 돌아온 날, 언니가 사흘을 내 집에 와서 밥을 했어. 말은 한마디도 안 하고. 그게 제일 고마웠다.',
+    '네가 끓인 건 언니 것보다 싱거워. …근데 그게 네 맛이지. 언니 흉내 낼 것 없다.',
+  ],
+  sori: [
+    '엄마는 서울 병원에서 일해요. 밤에도 일해서 전화가 잘 안 돼요. 그래서 저녁은 맨날 할머니 식당에서 먹었어요.',
+    "할머니가 그랬어요. '소리야, 밥 먹을 때 옆에 사람이 있으면 그게 식구다.' 그럼 우리도 식구예요?",
+    '나 커서 요리사 될 거예요. 엄마 퇴근하면 밥해 줄 거예요. 달걀볶음밥부터 가르쳐 줘요!',
+  ],
+  doyun: [
+    '서울에서 가구 회사에 다녔어요. 삼 년 동안 책상 다리만 그렸죠. 어느 날 손이 떨려서 선을 못 긋겠더라고요.',
+    "여기 와서 처음 만든 게 그 식당 의자예요. 할머니가 앉아 보더니 '삐걱거리네' 하고는, 십 년을 그 의자만 쓰셨어요.",
+    '당신도 도망쳐 온 거죠. …괜찮아요. 도망친 데서 밥 짓고 사는 사람, 여기 하나 더 있으니까.',
+  ],
+  captain: [
+    '…순례하고는 국민학교 동창이다. 도시락을 못 싸 온 날은 그 애가 제 밥을 반 덜어 줬지.',
+    '네 어머니가 떠난 뒤로, 나는 매일 막배로 들어왔다. 순례를 벤치에 혼자 두기 싫어서. 말은 안 했다. 그냥 옆에 앉았지.',
+    '…네 할머니한테 못 한 말이 있다. 밥 잘 먹었다고. 육십 년 치를. 네가 대신 들어라. 잘 먹었다.',
+  ],
+};
