@@ -15,7 +15,7 @@ export const GOALS = {
   q_ijang2: '생선구이를 만들어 이장님께 가져가자 (생선: 부두 끝에서 낚시 / 무: 텃밭)',
   cauldron: '식당 주방의 가마솥을 열어 보자',
   gukbap: '가마솥에 모락국밥을 끓이자 — 쌀, 손질한 무, 손질한 버섯, 된장',
-  epilogue: '1부 끝 — 식당은 계속 꾸려 갈 수 있어요',
+  epilogue: '1부 끝 — 장부의 도전 과제, 식당 확장, 나만의 요리를 이어 가 보세요',
 };
 
 const batchim = s => { const c = s.charCodeAt(s.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; };
@@ -63,6 +63,8 @@ export function makeStory(A) {
       await A.say('me', '맛이… 난다.');
       await A.narr('삼 년 만이었다.\n무언가를 먹고 맛있다고 느낀 건.');
       await A.say('me', '이걸 누가 먹어 주면 좋겠다. …가게를 열어 보자.');
+      await A.narr('그러고 보니 할머니가 그랬다.\n"손맛은 사람마다 달라. 네 손이 잘하는 걸 해라."');
+      await A.pickTrait();
       A.setStep('first_open');
       A.tip('영업을 시작하면 손님이 와서 말풍선으로 주문해요.\n요리를 만들어 손님 식탁에 가져다주세요. 서두르지 않아도 괜찮아요.');
     },
@@ -79,6 +81,7 @@ export function makeStory(A) {
       await A.say('ijang', "자, 이거 받아라. 누님이 나한테 맡긴 거다. '손주가 제 손으로 불을 지피거든 줘라' 하셨지.");
       A.learn(['doenjang_jjigae', 'radish_soup']);
       await A.say('ijang', '다른 장들은 금자 누님, 소리, 도윤이, 한 선장이 갖고 있을 거다. 그냥은 안 내놓을걸? 누님이 그러라고 시켰거든. 허허.');
+      await A.say('ijang', '아, 장사가 잘돼서 식탁이나 화구가 모자라거든 숲속 도윤이를 찾아가라. 손재주가 좋다. 가게 살림은 「장부」에 적어 두고.');
       await A.say('ijang', '바닷가 금자 누님부터 가 봐라. 순례 누님 된장찌개 못 먹은 지 삼 년이라고 노래를 불러. 두부랑 된장은 우리 가게에 있다!');
       A.setStep('q_geumja');
     },
@@ -255,18 +258,18 @@ export function makeStory(A) {
     },
     async doyun() {
       const s = st();
-      if (s === 'q_doyun') {
-        if (A.has('gamjajeon')) {
-          if (await A.choose(['감자전을 건넨다', '아직은…']) === 0) { A.take('gamjajeon'); return scenes.doyun_give(); }
-          return;
-        }
-        return A.say('doyun', '…어, 안녕하세요. 식당 다시 여셨다면서요. 지붕 새는 데 있으면 말씀하세요. 그 집 지붕, 제가 고쳤거든요.');
+      if (s === 'q_doyun' && A.has('gamjajeon')) {
+        if (await A.choose(['감자전을 건넨다', '아직은…']) === 0) { A.take('gamjajeon'); return scenes.doyun_give(); }
+        return;
       }
-      if (!after('q_doyun')) return A.say('doyun', '…아, 네. 안녕하세요. (나무를 다듬느라 바빠 보인다)');
+      if (!after('sleep1')) return A.say('doyun', '…아, 네. 안녕하세요. (나무를 다듬느라 바빠 보인다)');
+      if (await A.choose(['목공소에 일을 맡긴다', '이야기한다']) === 0) return A.workshop();
+      if (s === 'q_doyun') return A.say('doyun', '…어, 안녕하세요. 식당 다시 여셨다면서요. 지붕 새는 데 있으면 말씀하세요. 그 집 지붕, 제가 고쳤거든요.');
+      if (!after('q_doyun')) return A.say('doyun', '식당 손볼 데 있으면 말씀하세요. 식탁이든 화구든, 재료값만 받고 해 드릴게요.');
       return A.say('doyun', pick([
         '버섯은 그늘진 나무 밑에, 산나물은 볕 드는 풀밭에 나요. 밤사이 또 올라오고요.',
         '도시에서 도망치듯 왔는데, 여기선 아무도 왜 왔냐고 안 묻더라고요.',
-        '식당 의자가 삐걱거리면 가져오세요. 그런 건 제가 잘해요.',
+        '식당에 별이 늘면 더 큰 일도 맡을 수 있어요. 식탁이든 화구든요.',
       ]));
     },
     async captain() {

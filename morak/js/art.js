@@ -286,6 +286,15 @@ const ICON_DRAW = {
   page: g => { R(g, '#fbf3dc', 3, 1, 7, 10); R(g, '#e3d6b4', 9, 1, 1, 10); R(g, '#a8794f', 4, 3, 4, 1); R(g, '#a8794f', 4, 5, 4, 1); R(g, '#a8794f', 4, 7, 3, 1); },
   rod: g => { for (let i = 0; i < 9; i++) R(g, '#a5754a', 2 + i, 10 - i, 1, 1); R(g, '#ddd', 10, 2, 1, 5); R(g, '#e25c5c', 9, 7, 2, 2); },
 };
+const MAINCOL = { rice: '#fbf6e8', egg: '#f4dc86', tofu: '#fdfaf0', doenjang: '#b9793f', pa: '#5fa644', mu: '#f8f5ec', gamja: '#ecc56c', mushroom: '#a9683f', namul: '#7cc05a', clam: '#ead4b2', miyeok: '#2f6b4f', fish: '#84adcc' };
+// 나만의 요리: 재료 색으로 그릇을 그려요 (남색 그릇/남색 테두리가 '내 요리' 표시)
+export function registerDish(id, cooker, ings) {
+  const c = ings.map(i => MAINCOL[i.replace(/_c$/, '')] || '#cccccc'), c1 = c[1] || c[0], c2 = c[2] || c1;
+  ICON_DRAW[id] = cooker === 'pan'
+    ? g => { plate(g); R(g, '#3d5a8c', 2, 10, 9, 1); ell(g, c[0], 6, 6, 3, 2); R(g, c1, 4, 6, 2, 1); R(g, c2, 7, 5, 2, 1); R(g, c1, 7, 7, 1, 1); }
+    : g => bowl(g, '#3d5a8c', c[0], [[4, 5, c1, 2], [7, 5, c2], [6, 6, c1], [8, 6, c2]]);
+  delete iconCache[id]; delete urlCache[id];
+}
 const iconCache = {};
 export function itemIcon(id) {
   if (iconCache[id]) return iconCache[id];

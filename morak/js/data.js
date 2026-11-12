@@ -75,3 +75,43 @@ export const NPC_GUEST_LINES = {
   doyun: ['…잘 먹겠습니다.', '따뜻한 밥은 오랜만이네요.'],
   captain: ['…음.', '밥 생각 없었는데.'],
 };
+
+/* ───────── 경영·성장 ───────── */
+export const VALUE = { rice: 2, egg: 2, tofu: 3, doenjang: 4, pa: 2, mu: 2, gamja: 2, mushroom: 3, namul: 3, clam: 3, miyeok: 3, fish: 6 };
+
+// 나의 손맛: 주인공의 특성
+export const TRAITS = {
+  fire: { name: '불맛 장인', desc: '팬 요리 값 +25%, 팬 조리가 빨라요' },
+  soup: { name: '국물 장인', desc: '냄비·가마솥 요리 값 +25%, 끓이는 시간이 줄어요' },
+  quick: { name: '날랜 손', desc: '손질이 순식간에 끝나고 발걸음이 빨라요' },
+  warm: { name: '살가운 주인', desc: '손님이 더 오래 기다려 주고, 팁이 두 배' },
+  thrift: { name: '알뜰한 살림꾼', desc: '수확·채집 +1, 만물상 값 1닢 할인' },
+};
+
+// 평판이 쌓이면 별이 올라요 (1~5성)
+export const RANKS = [0, 8, 25, 60, 120];
+export const rankOf = rep => RANKS.filter(t => rep >= t).length;
+
+// 도윤의 목공소에서 맡기는 일
+export const UPGRADES = [
+  { id: 'knife', name: '잘 드는 칼', desc: '손질 시간이 절반으로', cost: 60, rank: 1 },
+  { id: 'garden', name: '텃밭 거름', desc: '텃밭 수확 +1', cost: 70, rank: 1 },
+  { id: 'table4', name: '네 번째 식탁', desc: '한 번에 받는 손님이 늘어요', cost: 90, rank: 2 },
+  { id: 'pan2', name: '팬 하나 더', desc: '가운데 조리대 자리에 화구를 놓아요', cost: 120, rank: 2 },
+  { id: 'pot2', name: '냄비 하나 더', desc: '오른쪽 조리대 자리에 화구를 놓아요', cost: 120, rank: 2 },
+  { id: 'basket', name: '큰 바구니', desc: '숲·바닷가 채집 +1', cost: 90, rank: 2 },
+  { id: 'stove', name: '센 화구', desc: '모든 조리 시간 30% 단축', cost: 160, rank: 3 },
+  { id: 'table5', name: '다섯 번째 식탁', desc: '가게가 꽉 차요', cost: 180, rank: 3, need: 'table4' },
+];
+
+// 도전 과제 (달성하면 바로 보상)
+export const CHALLENGES = [
+  { id: 'first', name: '첫 빈 그릇', desc: '손님 1명 대접', reward: 10, test: G => G.stats.served >= 1 },
+  { id: 'mine', name: '내 이름을 건 한 그릇', desc: '나만의 요리를 5그릇 대접', reward: 50, test: G => (G.stats.custom || 0) >= 5 },
+  { id: 'regular', name: '단골이 생기다', desc: '누적 30그릇 대접', reward: 40, test: G => G.stats.served >= 30 },
+  { id: 'perfect', name: '한 분도 놓치지 않기', desc: '5명 이상 온 날, 돌아간 손님 없이 영업 끝', reward: 40, test: G => (G.stats.perfect || 0) >= 1 },
+  { id: 'busy', name: '북적북적', desc: '하루에 8그릇 대접', reward: 60, test: G => (G.stats.best || 0) >= 8 },
+  { id: 'rich', name: '든든한 금고', desc: '누적 500닢 벌기', reward: 80, test: G => G.stats.earned >= 500 },
+  { id: 'pages', name: '수첩을 다시 채우다', desc: '할머니의 레시피 9장 모두 모으기', reward: 100, test: G => RECIPE_ORDER.every(r => G.recipes.includes(r)) },
+  { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
+];
