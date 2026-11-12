@@ -162,16 +162,16 @@ export const WEAR = [
   { id: 'shirt_white', kind: 'shirt', col: '#f4f1e6', name: '흰 조리복', free: true },
   { id: 'shirt_sky', kind: 'shirt', col: '#8fb9cf', name: '하늘색 셔츠', free: true },
   { id: 'shirt_mint', kind: 'shirt', col: '#9fd27a', name: '풀색 셔츠', free: true },
-  { id: 'shirt_work', kind: 'shirt', col: '#5a8a4b', name: '농장 작업복', cost: 30, at: 'farm' },
-  { id: 'shirt_red', kind: 'shirt', col: '#c4553f', name: '장터 빨간 셔츠', cost: 35, at: 'town' },
-  { id: 'shirt_plum', kind: 'shirt', col: '#9a5fa8', name: '양장점 자주 셔츠', cost: 45, at: 'town' },
-  { id: 'shirt_navy', kind: 'shirt', col: '#2f4670', name: '섬 남색 셔츠', cost: 40, at: 'island' },
+  { id: 'shirt_work', fx: '채집할 때 기운이 덜 들어요', kind: 'shirt', col: '#5a8a4b', name: '농장 작업복', cost: 30, at: 'farm' },
+  { id: 'shirt_red', fx: '빠른 대접 팁 +1', kind: 'shirt', col: '#c4553f', name: '장터 빨간 셔츠', cost: 35, at: 'town' },
+  { id: 'shirt_plum', fx: '손님이 조금 더 기다려 줘요', kind: 'shirt', col: '#9a5fa8', name: '양장점 자주 셔츠', cost: 45, at: 'town' },
+  { id: 'shirt_navy', fx: '낚시 하루 2번 더', kind: 'shirt', col: '#2f4670', name: '섬 남색 셔츠', cost: 40, at: 'island' },
   { id: 'hat_none', kind: 'hat', hat: 'none', col: '#d8caa9', name: '모자 없음', free: true },
   { id: 'hat_band', kind: 'hat', hat: 'band', col: '#e25c5c', name: '빨간 머리띠', free: true },
-  { id: 'hat_straw', kind: 'hat', hat: 'straw', col: '#ecd08a', name: '밀짚모자', cost: 30, at: 'farm' },
-  { id: 'hat_beanie', kind: 'hat', hat: 'beanie', col: '#5b9fc7', name: '털모자', cost: 40, at: 'town' },
-  { id: 'hat_towel', kind: 'hat', hat: 'towel', col: '#f7f3e6', name: '해녀 수건', cost: 30, at: 'island' },
-  { id: 'hat_cap', kind: 'hat', hat: 'cap', col: '#2f4670', name: '선장 모자', cost: 60, at: 'island' },
+  { id: 'hat_straw', fx: '텃밭 수확 +1', kind: 'hat', hat: 'straw', col: '#ecd08a', name: '밀짚모자', cost: 30, at: 'farm' },
+  { id: 'hat_beanie', fx: '몸이 따뜻해 기운이 덜 빠져요', kind: 'hat', hat: 'beanie', col: '#5b9fc7', name: '털모자', cost: 40, at: 'town' },
+  { id: 'hat_towel', fx: '조개·미역 채집 +1', kind: 'hat', hat: 'towel', col: '#f7f3e6', name: '해녀 수건', cost: 30, at: 'island' },
+  { id: 'hat_cap', fx: '입질을 오래 기다려 줘요', kind: 'hat', hat: 'cap', col: '#2f4670', name: '선장 모자', cost: 60, at: 'island' },
 ];
 
 // 오늘의 일: 아침마다 가끔 생기는 변수
@@ -189,3 +189,13 @@ export const EVENTS = {
 export const REQ_PEOPLE = ['민박집 할머니', '우체부 아저씨', '방앗간 아주머니', '분교 선생님', '등대지기', '약초꾼 할아버지', '소리', '금자 할머니', '도윤'];
 export const REQ_ITEMS = ['pa', 'mu', 'gamja', 'mushroom', 'namul', 'clam', 'miyeok'];
 export const WALKER_LINES = ['오늘 저녁은 모락식당 갈까.', '바람이 좋네.', '텃밭 파가 실하네.', '게시판에 뭐 붙었나?', '버스 올 시간인데.', '어디서 밥 냄새가…', '순례 할매 손주라며?', '날이 참 좋다.'];
+
+// 같이 밥을 먹을 때 하는 말
+export const SHARE_LINES = {
+  ijang: '허허, 혼자 먹는 밥은 밥이 아니라 끼니지. 같이 먹어야 밥이다!',
+  geumja: '언니가 살아 있을 땐 저녁마다 이렇게 마주 앉았는데. …한 숟갈 더 떠라.',
+  sori: '같이 먹으니까 더 맛있다! 내일도 같이 먹어요, 네?',
+  doyun: '…누구랑 마주 앉아 먹는 게 얼마 만인지 모르겠네요. 고맙습니다.',
+  captain: '…앉아라. 배 위에서도 밥은 둘러앉아 먹는 법이다.',
+};
+export const NPC_DONE = { ijang: 'sleep1', geumja: 'q_geumja', sori: 'q_sori', doyun: 'q_doyun', captain: 'q_captain' };
