@@ -8,5 +8,6 @@ self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;c
   if(u.hostname==='fonts.googleapis.com'||u.hostname==='fonts.gstatic.com'){
     e.respondWith(caches.open(FONTS).then(async c=>{const hit=await c.match(r);const net=fetch(r).then(res=>{if(res.ok||res.type==='opaque')c.put(r,res.clone());return res}).catch(()=>hit);return hit||net}));return}
   if(u.origin!==location.origin)return;
+  if(u.pathname.includes('/morak/'))return; // 게임(모락모락)은 수첩 앱 캐시를 거치지 않아요
   if(r.mode==='navigate'){e.respondWith(caches.match('index.html').then(hit=>hit||fetch(r)));return}
   e.respondWith(caches.match(r).then(hit=>hit||fetch(r)))});
