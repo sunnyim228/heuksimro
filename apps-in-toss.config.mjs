@@ -3,7 +3,7 @@
 import { defineConfig } from '@apps-in-toss/web-framework/config';
 
 export default defineConfig({
-  appName: 'morakmorak',
+  appName: 'morak-sikdang',
   permissions: [],            // 카메라·위치·연락처 등은 쓰지 않아요
   webBundleDir: 'dist',       // tools/build-toss.mjs가 게임 파일을 모아 두는 곳
   navigationBar: { withBackButton: true, withHomeButton: true, withTitle: true },
