@@ -132,6 +132,7 @@ export const CHALLENGES = [
   { id: 'helper', name: '마을의 손', desc: '게시판 의뢰 10건 해결', reward: 60, test: G => (G.stats.req || 0) >= 10 },
   { id: 'debtfree', name: '빚 없는 아침', desc: '대출을 받았다가 모두 갚기', reward: 50, test: G => !!G.flags.borrowed && G.bank.loan === 0 },
   { id: 'reader', name: '얼굴만 봐도 안다', desc: '사정 있는 손님에게 딱 맞는 음식을 10번', reward: 60, test: G => (G.stats.fit || 0) >= 10 },
+  { id: 'week', name: '일주일 동안 문 열기', desc: '서로 다른 7일에 모락식당 열기', reward: 50, test: G => (G.realDays || 0) >= 7 },
   { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
 ];
 
