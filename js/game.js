@@ -318,12 +318,57 @@ function genRequests() {
   }
 }
 
+/* ═════════ 현실 시간 ═════════ */
+// 1) 자리를 비운 사이에 흐르는 것  2) 함께한 시간 기록  3) 현실 시각에 맞춘 인사
+const AWAY_MIN = 10 * 60e3, AWAY_CAP = 8 * 3600e3;
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function markDay() { const k = todayKey(); if (G.lastDate !== k) { G.lastDate = k; G.realDays = (G.realDays || 0) + 1; checkChallenges(); } }
+function greeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 10) return '좋은 아침이에요. 아침은 드셨어요?';
+  if (h >= 10 && h < 14) return '점심때네요. 밥은 꼭 챙겨 먹어요.';
+  if (h >= 14 && h < 18) return '나른한 오후예요. 잠깐 쉬어 가요.';
+  if (h >= 18 && h < 22) return '저녁이에요. 오늘 하루도 수고했어요.';
+  return '늦은 밤이에요. 너무 늦게 자지 말아요.';
+}
+const fmtDur = ms => { const m = Math.max(1, Math.round(ms / 60000)), h = Math.floor(m / 60); return h ? `${h}시간${m % 60 ? ` ${m % 60}분` : ''}` : `${m}분`; };
+function awayReport() {
+  const now = Date.now(), last = G.seenAt || now;
+  G.seenAt = now;
+  const raw = now - last, ms = Math.min(raw, AWAY_CAP);
+  if (raw < AWAY_MIN || !opened()) return null;
+  const h = ms / 3600e3, lines = [];
+  const curing = G.craft.filter(c => !c.ready);
+  if (h >= 1 && curing.length) { curing.forEach(c => { c.ready = true; }); lines.push(['dried_mushroom', `건조대에 널어 둔 ${curing.length}가지가 다 말랐어요`]); }
+  if (G.bank.dep > 0) { const gain = Math.min(10, Math.floor(G.bank.dep * 0.01 * h / 8)); if (gain) { G.bank.dep += gain; lines.push(['coin', `맡겨 둔 돈에 이자가 붙었어요 (+${gain}닢)`]); } }
+  const crops = Object.keys(G.taken).filter(k => k.startsWith('crop'));
+  if (h >= 2 && crops.length) { crops.forEach(k => delete G.taken[k]); lines.push(['pa', '텃밭이 다시 자랐어요']); }
+  const wild = Object.keys(G.taken).filter(k => !k.startsWith('crop'));
+  if (h >= 4 && wild.length) { wild.forEach(k => delete G.taken[k]); lines.push(['mushroom', '숲과 바닷가에도 다시 났어요']); }
+  const up = Math.min(100 - G.body.en, Math.round(h * 12));
+  if (up > 0) { G.body.en += up; lines.push(['heart', `푹 쉬어서 기운이 돌아왔어요 (+${up})`]); }
+  return { ms, capped: raw > AWAY_CAP, lines };
+}
+// 이어하기와, 다른 앱에 갔다가 돌아왔을 때 불러요. 벌은 없고 반가움만 있어요.
+function welcomeBack() {
+  if (!G || mode !== 'play') return;
+  markDay();
+  if (busy) return;
+  const r = awayReport();
+  if (!r) return;
+  Au.sfx('page');
+  openPanel('다녀오셨어요', `<p class="center">${fmtDur(r.ms)} 동안 자리를 비웠어요.${r.capped ? '<br><small>(8시간까지만 세어요)</small>' : ''}</p>` +
+    (r.lines.length ? r.lines.map(([ic, t]) => `<div class="row"><img class="ic" src="${iconURL(ic)}"><span class="grow">${t}</span></div>`).join('') : '<p class="center"><small>가게는 조용히 잘 있었어요.</small></p>') +
+    `<p class="center">${greeting()}</p><p class="center"><button class="btn main" data-a="ok">가게로</button></p>`, (a, v, p) => p.close()).then(() => { checkProgress(); save(); });
+}
+
 /* ═════════ 저장 ═════════ */
 function newState(name) {
   return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true }, body: { en: 100, taste: 35, meals: 0, ate: [], shared: false } };
 }
 function save() {
   if (!G || mode !== 'play' || busy) return; // 대화·장면 도중에는 저장하지 않아요 (장면이 끝나면 저장)
+  G.seenAt = Date.now();
   const invAll = { ...G.inv };
   for (const id of looseItems()) invAll[id] = (invAll[id] || 0) + 1;
   // 영업 중에 닫으면 가게 안 문 앞에서 다시 시작해요
@@ -369,7 +414,9 @@ function refreshHUD() {
   $('#goal').classList.toggle('hide', !goal || !!svc);
   $('#goal .txt').textContent = goal;
   $('#svcbar').classList.toggle('hide', !svc);
-  if (svc) $('#svcbar').textContent = `영업 중 · 대접 ${svc.served}그릇 · 남은 손님 ${svc.left + svc.cust.filter(c => c.state !== 'out').length}명`;
+  if (svc) $('#svcbar').textContent = svc.auto
+    ? `${NPC_NAME[svc.helper]}에게 맡김 · ${svc.served}그릇 · ${svc.earned}닢 · 남은 요리 ${readyDishes().reduce((t, d) => t + G.inv[d], 0)}그릇`
+    : `영업 중 · 대접 ${svc.served}그릇 · 남은 손님 ${svc.left + svc.cust.filter(c => c.state !== 'out').length}명`;
 }
 
 /* ═════════ UI: 대화 ═════════ */
@@ -711,7 +758,8 @@ function openLedger() {
       <p>식탁 ${tables().length}개 · 팬 ${owns('pan2') ? 2 : 1}개 · 냄비 ${owns('pot2') ? 2 : 1}개${UPGRADES.filter(u => owns(u.id) && !/table|pan2|pot2/.test(u.id)).map(u => ' · ' + u.name).join('')}</p>
       <div class="sec">도전 과제 (${CHALLENGES.filter(c => G.done[c.id]).length}/${CHALLENGES.length})</div>
       ${CHALLENGES.map(c => `<div class="row"><span class="grow ${G.done[c.id] ? 'done' : ''}">${G.done[c.id] ? '✔ ' : ''}${c.name}<br><small>${c.desc}</small></span><span>${c.reward}닢</span></div>`).join('')}
-      <div class="sec">지금까지</div><p>대접한 그릇 ${G.stats.served} · 번 돈 ${G.stats.earned}닢 · 하루 최고 ${G.stats.best || 0}그릇</p>`;
+      <div class="sec">함께한 시간</div><p>문 연 날 <b>${G.realDays || 1}</b>일 · 함께한 시간 <b>${fmtDur((G.stats.playSec || 0) * 1000)}</b><br><small>자리를 비운 사이에도 장독은 익고 텃밭은 자라요. 8시간까지 세어 줘요.</small></p>
+      <div class="sec">지금까지</div><p>대접한 그릇 ${G.stats.served} · 맡겨 두고 판 그릇 ${G.stats.auto || 0} · 번 돈 ${G.stats.earned}닢 · 하루 최고 ${G.stats.best || 0}그릇</p>`;
   };
   return openPanel('장부', html(), (a, v, p) => {
     if (a === 'trait' && G.coins >= 100 && confirm('100닢을 내고 손맛을 다시 고를까요?')) { G.coins -= 100; G.trait = null; p.close(); runScene(pickTrait); }
@@ -943,22 +991,54 @@ function updateCookers(dt) {
 
 /* ── 영업 ── */
 function menuNow(reserved) { return G.recipes.filter(r => servings(r, reserved) > 0 || dishStock(r) > 0); }
+const helperId = () => STEPS.indexOf(G.step) > STEPS.indexOf('q_sori') ? 'sori' : 'ijang';
+const readyDishes = () => Object.keys(G.inv).filter(i => RECIPES[i] && G.inv[i] > 0);
 function useSign() {
-  if (svc) return toast('영업 중이에요. 손님이 모두 돌아가면 끝나요.');
-  if (G.servedToday) return toast('오늘 영업은 끝났어요. 2층에서 푹 쉬어요.');
+  if (svc) {
+    if (svc.auto) return runScene(async () => { if (await UI.choose(['이제 그만 맡기기', '계속 지켜보기']) === 0) { svc.left = 0; toast('남은 손님까지만 받고 닫을게요.'); } });
+    return toast('영업 중이에요. 손님이 모두 돌아가면 끝나요.');
+  }
   if (G.step === 'enter_shop' || G.step === 'gather' || G.step === 'first_cook') return toast('아직은 일러요. 먼저 음식을 하나 만들어 봐요.');
-  const menu = menuNow({});
-  if (!menu.length) return no('지금 만들 수 있는 요리가 없어요. 재료를 구해 와요.');
+  const canAuto = opened() && readyDishes().length > 0;
+  const menu = menuNow({}), canOpen = !G.servedToday && menu.length > 0;
+  if (!canOpen && !canAuto) {
+    if (G.servedToday) return toast('오늘 영업은 끝났어요. 2층에서 푹 쉬어요.\n만들어 둔 요리가 있으면 가게를 맡겨 둘 수도 있어요.');
+    return no('지금 만들 수 있는 요리가 없어요. 재료를 구해 와요.');
+  }
   runScene(async () => {
-    await UI.narr(`오늘의 메뉴: ${menu.map(r => RECIPES[r].name).join(', ')}`);
-    if (await UI.choose(['영업을 시작한다', '아직 준비 중']) !== 0) return;
-    svc = { left: Math.max(2, Math.min(G.recipes.length + tables().length, 4 + rank() * 2) + ({ rain: -2, market: 3, tour: 4 }[G.event] || 0)), spawnT: 1.2, cust: [], served: 0, earned: 0, missed: 0, reserved: {}, usedNpc: {}, stuck: 0 };
-    G.time = Math.max(G.time, 17 * 60);
-    Au.setMood('service'); Au.sfx('door'); toast('모락식당, 문 열었습니다!');
+    const opts = [];
+    if (canOpen) { await UI.narr(`오늘의 메뉴: ${menu.map(r => RECIPES[r].name).join(', ')}`); opts.push('영업을 시작한다'); }
+    if (canAuto) opts.push(`${NPC_NAME[helperId()]}에게 맡기고 지켜본다`);
+    opts.push('아직 준비 중');
+    const pick = opts[await UI.choose(opts)];
+    if (pick === '영업을 시작한다') {
+      svc = { left: Math.max(2, Math.min(G.recipes.length + tables().length, 4 + rank() * 2) + ({ rain: -2, market: 3, tour: 4 }[G.event] || 0)), spawnT: 1.2, cust: [], served: 0, earned: 0, missed: 0, reserved: {}, usedNpc: {}, stuck: 0 };
+      G.time = Math.max(G.time, 17 * 60);
+      Au.setMood('service'); Au.sfx('door'); toast('모락식당, 문 열었습니다!');
+    } else if (pick.includes('맡기고')) await startAuto();
   });
 }
+// 미리 만들어 둔 요리를 돕는 사람이 대신 내 줘요. 화면을 켜 둔 동안 손님이 오고, 나는 구경만 해도 돼요.
+async function startAuto() {
+  const id = helperId(), n = readyDishes().reduce((t, d) => t + G.inv[d], 0);
+  await UI.say(id, id === 'sori'
+    ? `맡겨 줘요! 만들어 둔 요리 ${n}그릇, 제가 손님상에 내갈게요. 편히 구경해요.`
+    : `허허, 가게는 내가 보마. 만들어 둔 ${n}그릇 다 팔 때까지 좀 앉아 쉬어라.`);
+  svc = { auto: true, helper: id, left: Infinity, spawnT: 2, cust: [], served: 0, earned: 0, missed: 0, reserved: {}, dishRes: {}, usedNpc: {}, stuck: 0,
+    helperG: { spr: CHARS[id], dir: 'down', x: 13, y: 3, px: 13 * T, py: 3 * T, idle: true, walkT: 0 } };
+  Au.setMood('day'); Au.sfx('door');
+  toast('가게를 맡겼어요. 손님이 오면 알아서 내 줘요.\n그만하려면 문 옆 팻말을 눌러요. 그 사이에 요리를 더 만들어 선반에 넣어도 돼요.', null, 6500);
+}
+function endAuto() {
+  const s = svc; svc = null; Au.sfx('done');
+  const line = s.helper === 'sori'
+    ? (s.served ? `${s.served}그릇 나갔어요! ${s.earned}닢이에요. 잘했죠?` : '오늘은 조용했어요.')
+    : (s.served ? `허허, ${s.served}그릇 다 나갔다! ${s.earned}닢이다.` : '오늘은 손님이 뜸하구먼.');
+  toast(`${NPC_NAME[s.helper]}: "${line}"`, 'coin', 5200);
+  refreshHUD(); save();
+}
 function pickOrder() {
-  const c = G.recipes.filter(r => servings(r, svc.reserved) > 0);
+  const c = svc.auto ? readyDishes().filter(r => G.inv[r] - (svc.dishRes[r] || 0) > 0) : G.recipes.filter(r => servings(r, svc.reserved) > 0);
   if (!c.length) return null;
   return c[Math.floor(Math.random() * c.length)];
 }
@@ -970,12 +1050,14 @@ function spawnGuest(rid, table) {
   const spr = npc ? CHARS[npc] : CHARS['guest' + Math.floor(Math.random() * GUEST_LOOKS.length)];
   const g = { spr, npc, x: 8, y: 9, px: 8 * T, py: 10 * T, dir: 'up', state: 'in', table, order: rid, patience: (G.trait === 'warm' ? 130 : 90) + (wearing('shirt_plum') ? 15 : 0), t: 0, walkT: 0 };
   g.maxP = g.patience;
-  if (G.event === 'gourmet' && !svc.gourmet) { svc.gourmet = true; g.gourmet = true; }
+  if (svc.auto) { /* 맡겨 둔 가게는 이름 그대로 주문해요 */ }
+  else if (G.event === 'gourmet' && !svc.gourmet) { svc.gourmet = true; g.gourmet = true; }
   else if (opened() && Math.random() < 0.35) { // 요리 이름 대신 사정을 말하는 손님 (예약해 둔 요리로 풀 수 있는 사정만)
     const ms = MOODS.filter(m => dishTags(rid).includes(m.tag)); if (ms.length) g.mood = pickOne(ms);
   }
   g.path = bfs(8, 9, (x, y) => x === table.x && y === table.y - 1, (x, y) => passable(x, y, true)) || [];
-  table.cust = g; reserve(rid, 1); svc.cust.push(g); Au.sfx('door');
+  table.cust = g; if (svc.auto) svc.dishRes[rid] = (svc.dishRes[rid] || 0) + 1; else reserve(rid, 1);
+  svc.cust.push(g); Au.sfx('door');
 }
 function moveGuest(g, dt) {
   const tx = g.x * T, ty = g.y * T, sp = (g.sp || 52) * dt;
@@ -995,29 +1077,42 @@ function updateService(dt) {
   const free = tables().filter(t => !t.cust);
   if (svc.left > 0 && svc.spawnT <= 0 && free.length) {
     const rid = pickOrder();
-    if (rid) { spawnGuest(rid, free[Math.floor(Math.random() * free.length)]); svc.left--; svc.spawnT = (6 + Math.random() * 5) * 3 / tables().length; svc.stuck = 0; }
+    if (svc.auto && !rid) { if (svc.cust.length) svc.spawnT = 2; else svc.left = 0; }
+    else if (rid && svc.auto) { spawnGuest(rid, pickOne(free)); svc.spawnT = 7 + Math.random() * 6; }
+    else if (rid) { spawnGuest(rid, free[Math.floor(Math.random() * free.length)]); svc.left--; svc.spawnT = (6 + Math.random() * 5) * 3 / tables().length; svc.stuck = 0; }
     else { svc.spawnT = 2; if (!svc.cust.length && ++svc.stuck >= 2) { svc.left = 0; toast('재료가 다 떨어졌어요. 오늘은 여기까지!'); } }
   }
   for (let i = svc.cust.length - 1; i >= 0; i--) {
     const g = svc.cust[i];
     if (g.state === 'in') { if (moveGuest(g, dt)) { g.state = 'wait'; g.dir = 'down'; Au.sfx('blip'); if (g.mood) floater(g.px + 8, g.py - 30, g.mood.line, 'bubble', 4.5); } }
+    else if (g.state === 'wait' && svc.auto) {
+      g.t += dt;
+      if (g.t >= 2.5) { // 돕는 사람이 내 줘요
+        addItem(g.order, -1); svc.dishRes[g.order]--;
+        g.state = 'eat'; g.t = 4.5; g.served = g.order; g.table.dish = g.order;
+        svc.served++; G.stats.auto = (G.stats.auto || 0) + 1; Au.sfx('heart');
+        floater(svc.helperG.px + 8, svc.helperG.py - 12, pickOne(['나갑니다!', '맛있게 드세요!', '여기요!']), 'bubble', 1.6);
+        floater(g.px + 8, g.py - 12, pickOne(GUEST_LINES), 'bubble', 2.4);
+      }
+    }
     else if (g.state === 'wait') {
       g.patience -= dt;
       if (g.patience <= 0) { reserve(g.order, -1); svc.missed++; floater(g.px + 8, g.py - 12, '다음에 올게요…', 'bubble', 2); leave(g); }
     } else if (g.state === 'eat') {
       g.t -= dt;
       if (g.t <= 0) {
-        const pay = Math.round(priceOf(g.served || g.order) * (g.gourmet ? 3 : 1) * (g.mood ? (g.fit ? 1.5 : 0.8) : 1)) + (g.tip ? (2 + rank() + (wearing('shirt_red') ? 1 : 0)) * (G.trait === 'warm' ? 2 : 1) : 0);
+        const pay = svc.auto ? Math.round(priceOf(g.order) * 0.8) : Math.round(priceOf(g.served || g.order) * (g.gourmet ? 3 : 1) * (g.mood ? (g.fit ? 1.5 : 0.8) : 1)) + (g.tip ? (2 + rank() + (wearing('shirt_red') ? 1 : 0)) * (G.trait === 'warm' ? 2 : 1) : 0);
         G.coins += pay; svc.earned += pay; G.stats.earned += pay; Au.sfx('coin');
         floater(g.px + 8, g.py - 10, `+${pay}닢`);
         leave(g);
       }
     } else if (g.state === 'out') { if (moveGuest(g, dt)) svc.cust.splice(i, 1); }
   }
-  if (svc.left <= 0 && !svc.cust.length) endService();
+  if (svc.left <= 0 && !svc.cust.length) (svc.auto ? endAuto() : endService());
 }
 function useTable(t) {
   const g = t.cust;
+  if (svc && svc.auto && g) return toast(`${NPC_NAME[svc.helper]}가 내갈 거예요. 편히 구경해요.`);
   if (!g || g.state !== 'wait') { if (g && g.state === 'eat') return toast('맛있게 드시는 중이에요.'); return toast(svc ? '빈 자리예요.' : '손님 식탁. 영업을 시작하면 손님이 앉아요.'); }
   if (!P.hands) return g.mood ? toast(`"${g.mood.line}"\n어울리는 요리를 골라 내어 보세요. (수첩에 요리마다 성격이 적혀 있어요)`, 'q', 5200) : toast(`「${RECIPES[g.order].name}」를 기다리고 있어요.`, g.order);
   if (g.mood) { if (!RECIPES[P.hands]) return no('완성한 요리를 내어 주세요.'); g.fit = dishTags(P.hands).includes(g.mood.tag); }
@@ -1189,6 +1284,7 @@ function update(dt) {
   if (tapMark) { tapMark.t -= dt; if (tapMark.t <= 0) tapMark = null; }
   if (mode === 'title') { const m = MAPS.village; camX = clamp(28 * T - VW / 2 + Math.sin(tAnim * 0.15) * 60, 0, m.w * T - VW); camY = clamp(15 * T - VH / 2 + Math.cos(tAnim * 0.11) * 30, 0, m.h * T - VH); }
   if (mode !== 'play') return;
+  G.stats.playSec = (G.stats.playSec || 0) + dt;
   // 모락모락: 식당 굴뚝 연기
   if (map.name === 'village' && Math.random() < dt * (G.recipes.length ? 5 : 0)) particles.push({ x: 31 * T + 2 + Math.random() * 4, y: 10 * T + 4, vx: 3, vy: -7 - Math.random() * 4, life: 2.2, max: 2.2 });
   if (!busy) {
@@ -1253,6 +1349,7 @@ function render() {
   if (mode === 'play') {
     if (map === MAPS[G.map]) list.push({ k: P.py + T + 0.5, pl: true });
     if (svc && map.name === 'shop') for (const g of svc.cust) list.push({ k: g.py + T + 0.4, g });
+    if (svc && svc.auto && map.name === 'shop') list.push({ k: svc.helperG.py + T + 0.3, g: svc.helperG });
     if (map.name === 'village') for (const w of walkers) list.push({ k: w.py + T + 0.3, g: w });
   }
   list.sort((a, b) => a.k - b.k);
@@ -1323,7 +1420,12 @@ function render() {
   for (const p of particles) puff(ctx, p.x, p.y, p.life / p.max);
   ctx.restore();
 
-  // 시간에 따른 빛
+  // 시간에 따른 빛 (타이틀은 현실 시각을 따라요)
+  if (mode === 'title') {
+    const h = new Date().getHours();
+    const tint = h >= 20 || h < 5 ? 'rgba(28,36,92,.42)' : h >= 17 ? 'rgba(255,130,60,.18)' : h < 7 ? 'rgba(150,140,220,.18)' : null;
+    if (tint) { ctx.fillStyle = tint; ctx.fillRect(0, 0, VW, VH); }
+  }
   if (G && mode === 'play' && map.name === 'village') {
     const t = G.time / 60;
     if (G.event === 'rain') {
@@ -1357,8 +1459,10 @@ function startGame(state, isNew) {
   $('#title').classList.add('hide'); $('#hud').classList.remove('hide');
   Au.unlock(); Au.setMood(G.time >= 19 * 60 ? 'night' : 'day');
   refreshHUD();
+  if (isNew) { G.seenAt = Date.now(); G.lastDate = todayKey(); G.realDays = 1; }
   if (isNew || G.step === 'intro') runScene(story.scenes.intro);
   else if (!G.trait && G.recipes.length && G.step !== 'first_cook' && G.step !== 'gather') runScene(pickTrait);
+  else { welcomeBack(); if (!busy) toast(greeting(), 'heart', 4200); }
 }
 function boot() {
   resize();
@@ -1375,11 +1479,12 @@ function boot() {
     const name = ($('#name').value || '').trim().slice(0, 6) || '하루';
     startGame(newState(name), true);
   });
-  addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  addEventListener('visibilitychange', () => { if (document.hidden) save(); else welcomeBack(); });
+  $('#greet').textContent = greeting();
   addEventListener('pagehide', save);
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
+  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
 }
 boot();
