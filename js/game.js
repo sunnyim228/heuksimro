@@ -735,7 +735,7 @@ function openSettings() {
     <div class="row"><span class="grow">배경 음악</span><button class="btn" data-a="music">${Au.opt.music ? '켜짐' : '꺼짐'}</button></div>
     <div class="row"><span class="grow">지금 저장</span><button class="btn" data-a="save">저장</button></div>
     <div class="row"><span class="grow">처음부터 다시</span><button class="btn" data-a="reset">지우기</button></div>
-    <div class="row"><span class="grow">예전 여행 수첩 앱 (흑심으路)</span><a class="btn" href="heuksim/" style="text-decoration:none">열기</a></div>
+    ${window.__TOSS__ ? '' : `<div class="row"><span class="grow">예전 여행 수첩 앱</span><a class="btn" href="heuksim/" style="text-decoration:none">열기</a></div>`}
     <div class="sec">조작</div>
     <p>· 화면을 누르면 그곳으로 걸어가요.<br>· 사람·물건·조리대를 누르면 다가가서 말을 걸거나 써요.<br>· 키보드: 방향키/WASD 이동, 스페이스 살펴보기.</p>
     <div class="sec">요리 순서</div>

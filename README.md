@@ -57,9 +57,30 @@
 
 로컬에서 보려면 저장소 폴더에서 `python3 -m http.server` 실행 후 `http://localhost:8000/`.
 
+## 토스 앱(앱인토스)에 올리기
+
+저장소 맨 위의 **`morakmorak.ait`** 파일이 앱인토스에 올리는 묶음이에요. 이 파일 하나를 받아서 올리면 돼요.
+
+1. [앱인토스](https://toss.im/apps-in-toss) 콘솔에서 워크스페이스를 만들고 앱을 등록해요. **앱 이름(appName)은 `morakmorak`** 으로 맞춰요.
+2. 게임이라서 **등급분류 정보**를 콘솔에 입력해야 해요.
+3. 앱 등록 화면에서 `morakmorak.ait`를 올리고 검수를 요청해요.
+
+콘솔에 다른 앱 이름으로 등록했다면 `apps-in-toss.config.mjs`의 `appName`을 그 이름으로 고친 뒤 다시 묶어야 해요.
+
+```bash
+npm install
+npm run build:toss   # dist/ 에 게임 파일을 모으고 <앱이름>.ait 를 만들어요
+```
+
+| 파일 | 내용 |
+| --- | --- |
+| `apps-in-toss.config.mjs` | 앱 이름, 권한(없음), 화면 설정(당겨서 새로고침·밀어서 뒤로 가기 끔) |
+| `tools/build-toss.mjs` | 게임 파일(`index.html`, `js/`, `fonts/`)만 `dist/`에 모으기 |
+| `morakmorak.ait` | 위 두 가지로 만든 업로드용 묶음 |
+
 ---
 
-# 함께 들어 있는 것: 흑심으路 (`heuksim/`)
+# 함께 들어 있는 것: 여행 수첩 앱 (`heuksim/`)
 
 이 저장소에 먼저 있던, 연필로 쓰는 여행 수첩 앱이에요. 지금은 `heuksim/` 폴더로 옮겨 두었고, Pages 주소 뒤에 `/heuksim/`을 붙이면 열려요. 게임 안 설정에서도 열 수 있어요.
 
@@ -72,7 +93,7 @@
 
 1. Safari로 이 저장소의 GitHub Pages 주소 뒤에 `/heuksim/`을 붙여 열어요.
 2. 공유 버튼 → **홈 화면에 추가**를 눌러요.
-3. 홈 화면의 흑심으路 아이콘으로 열면 앱처럼 화면 전체로 열려요.
+3. 홈 화면의 수첩 아이콘으로 열면 앱처럼 화면 전체로 열려요.
 
 ### 업데이트
 
