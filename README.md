@@ -60,11 +60,11 @@
 
 ## 토스 앱(앱인토스)에 올리기
 
-저장소 맨 위의 **`morakmorak.ait`** 파일이 앱인토스에 올리는 묶음이에요. 이 파일 하나를 받아서 올리면 돼요.
+**`store/toss/`** 폴더의 `.ait` 파일이 앱인토스에 올리는 묶음이에요. 콘솔에 등록한 appName과 이름이 같은 파일 하나를 올리면 돼요.
 
-1. [앱인토스](https://toss.im/apps-in-toss) 콘솔에서 워크스페이스를 만들고 앱을 등록해요. **앱 이름(appName)은 `morakmorak`** 으로 맞춰요.
+1. [앱인토스](https://toss.im/apps-in-toss) 콘솔에서 워크스페이스를 만들고 앱을 등록해요. **appName은 `morak-sikdang`** 으로 맞춰요. 이미 쓰이고 있으면 `sotgol-sikdang`, `morakmorak-cooking` 순서로 써요.
 2. 게임이라서 **등급분류 정보**를 콘솔에 입력해야 해요.
-3. 앱 등록 화면에서 `morakmorak.ait`를 올리고 검수를 요청해요.
+3. 앱 등록 화면에서 같은 이름의 `.ait`를 올리고 검수를 요청해요. 입력 문구와 이미지는 `store/앱등록-내용.md`에 있어요.
 
 콘솔에 다른 앱 이름으로 등록했다면 `apps-in-toss.config.mjs`의 `appName`을 그 이름으로 고친 뒤 다시 묶어야 해요.
 
@@ -77,7 +77,7 @@ npm run build:toss   # dist/ 에 게임 파일을 모으고 <앱이름>.ait 를 
 | --- | --- |
 | `apps-in-toss.config.mjs` | 앱 이름, 권한(없음), 화면 설정(당겨서 새로고침·밀어서 뒤로 가기 끔) |
 | `tools/build-toss.mjs` | 게임 파일(`index.html`, `js/`, `fonts/`)만 `dist/`에 모으기 |
-| `morakmorak.ait` | 위 두 가지로 만든 업로드용 묶음 |
+| `store/toss/*.ait` | appName 후보별로 만든 업로드용 묶음 |
 
 ---
 
