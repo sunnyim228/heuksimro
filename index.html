@@ -35,7 +35,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .bars em{display:block;height:100%;background:var(--green)}
 .bars em.t{background:var(--accent)}.bars em.low{background:var(--red)}
 #hud-btns{display:flex;gap:.35rem}
-#hud-btns .btn{padding:.35rem .6rem;font-size:.85rem}
+#hud-btns{flex-wrap:wrap;justify-content:flex-end}
+#hud-btns .btn{padding:.35rem .55rem;font-size:.85rem;white-space:nowrap}
+@media (max-width:420px){#hud-btns{gap:.25rem}#hud-btns .btn{padding:.3rem .4rem;font-size:.78rem}#status{padding:.3rem .45rem;font-size:.78rem}}
 #goal{margin-top:.4rem;max-width:26rem;padding:.4rem .6rem;font-size:.8rem;line-height:1.45;background:rgba(255,244,220,.94)}
 #goal .lab{color:var(--accent);margin-right:.3rem}
 #goal.min .txt{display:none}
