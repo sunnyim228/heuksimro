@@ -1,5 +1,5 @@
 // 모락모락 — 솥골 식당 이야기 : 게임 엔진
-import { T, buildSprites, renderGround, makeChar, makeCreature, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
+import { T, buildSprites, renderGround, makeChar, makeAlien, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
 import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES, SHARE_LINES, NPC_DONE, TAG_NAME, tagsFor, MOODS, MOOD_MISS, BOND_STORIES } from './data.js';
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
@@ -1745,7 +1745,7 @@ function boot() {
   resize();
   SPR = buildSprites();
   for (const k in LOOKS) CHARS[k] = makeChar(LOOKS[k]);
-  for (const v of VISITORS) { CHARS[v.id] = makeCreature(v.kind, v.pal); NPC_NAME[v.id] = v.name; }
+  for (const v of VISITORS) { CHARS[v.id] = makeAlien(v.alien); NPC_NAME[v.id] = v.name; }
   CHARS.visitor = CHARS.eunha; NPC_NAME.visitor = '은하';
   GUEST_LOOKS.forEach((l, i) => { CHARS['guest' + i] = makeChar(l); });
   MAPS.village = buildVillage(); MAPS.shop = buildShop();

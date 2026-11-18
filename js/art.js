@@ -268,6 +268,49 @@ export function makeCreature(kind, pal) {
   return s;
 }
 
+/* ───────── 인형 같은 외계인 별손님 ───────── */
+// 사람처럼 서 있지만 머리가 크고, 눈이 크고, 더듬이가 달린 봉제 인형 같은 모습.
+// o: { skin, suit, ant: 'star'|'ball'|'long'|'curl', antCol }
+export function makeAlien(o) {
+  const W = 16, H = 22, skin = o.skin, sd = shade(skin, 0.86), suit = o.suit, su = shade(suit, 0.8), ac = o.antCol || shade(skin, 0.7);
+  function draw(dir, f) {
+    const c = mk(W, H), g = G(c);
+    // 더듬이
+    const tip = (x, y) => {
+      if (o.ant === 'star') { R(g, '#ffe58a', x - 1, y, 3, 1); R(g, '#ffe58a', x, y - 1, 1, 3); }
+      else if (o.ant === 'ball') { R(g, ac, x - 1, y - 1, 2, 2); R(g, '#ffffff', x - 1, y - 1, 1, 1); }
+      else R(g, ac, x, y, 1, 1);
+    };
+    if (o.ant === 'long') { R(g, ac, 4, 1, 1, 3); R(g, ac, 3, 0, 1, 2); R(g, ac, 11, 1, 1, 3); R(g, ac, 12, 0, 1, 2); }
+    else if (o.ant === 'curl') { R(g, ac, 5, 2, 1, 2); R(g, ac, 4, 1, 1, 1); R(g, ac, 5, 0, 2, 1); R(g, ac, 10, 2, 1, 2); R(g, ac, 11, 1, 1, 1); R(g, ac, 9, 0, 2, 1); }
+    else { R(g, ac, 5, 2, 1, 2); R(g, ac, 10, 2, 1, 2); tip(5, 1); tip(10, 1); }
+    // 큰 머리
+    ell(g, skin, 8, 8, 6, 4); R(g, skin, 2, 7, 13, 3);
+    R(g, sd, 3, 12, 11, 1);
+    // 몸 (작고 통통, 봉제선)
+    const leg = f === 1 ? 1 : 0, leg2 = f === 2 ? 1 : 0;
+    R(g, suit, 4, 13, 9, 5); R(g, su, 4, 17, 9, 1);
+    R(g, shade(suit, 1.25), 8, 13, 1, 4); // 가운데 봉제선
+    if (dir !== 'side') { R(g, skin, 2, 14, 2, 2); R(g, skin, 13, 14, 2, 2); }
+    else R(g, skin, 9, 14, 2, 2);
+    R(g, skin, 5, 18, 3, 2 - leg); R(g, skin, 9, 18, 3, 2 - leg2);
+    R(g, sd, 5, 19 - leg, 3, 1); R(g, sd, 9, 19 - leg2, 3, 1);
+    // 얼굴
+    const eye = '#2b1d18';
+    if (dir === 'down') {
+      R(g, eye, 4, 7, 3, 3); R(g, eye, 10, 7, 3, 3); R(g, '#ffffff', 4, 7, 1, 1); R(g, '#ffffff', 10, 7, 1, 1);
+      R(g, '#f3a79a', 3, 10, 2, 1); R(g, '#f3a79a', 12, 10, 2, 1); R(g, sd, 8, 10, 1, 1);
+    } else if (dir === 'side') {
+      R(g, eye, 10, 7, 3, 3); R(g, '#ffffff', 10, 7, 1, 1); R(g, '#f3a79a', 12, 10, 2, 1);
+    } else { R(g, sd, 6, 6, 5, 1); }
+    return outline(c);
+  }
+  const s = { down: [0, 1, 2].map(f => draw('down', f)), up: [0, 1, 2].map(f => draw('up', f)), right: [0, 1, 2].map(f => draw('side', f)) };
+  s.left = s.right.map(flip);
+  s.py = 0;
+  return s;
+}
+
 export function portrait(sprites, size = 4) {
   const c = mk(14 * size, 13 * size), g = G(c);
   g.drawImage(sprites.down[0], 1, sprites.py || 0, 14, 13, 0, 0, 14 * size, 13 * size);
