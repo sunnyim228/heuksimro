@@ -362,9 +362,17 @@ function welcomeBack() {
     `<p class="center">${greeting()}</p><p class="center"><button class="btn main" data-a="ok">가게로</button></p>`, (a, v, p) => p.close()).then(() => { checkProgress(); save(); });
 }
 
+/* ═════════ 처음 설정은 랜덤으로 ═════════ */
+const NAMES = ['하루', '봄이', '다온', '이안', '서리', '누리', '해솔', '가온', '도담', '라온', '단비', '새봄', '여름', '은재', '시우', '나래'];
+const randomName = () => pickOne(NAMES);
+function randomLook() {
+  const shirts = WEAR.filter(w => w.kind === 'shirt' && w.free).map(w => w.id);
+  return { hair: pickOne(HAIR_COLORS), style: pickOne(HAIR_STYLES)[0], shirt: pickOne(shirts), hat: pickOne(['hat_band', 'hat_none']), apron: true };
+}
+
 /* ═════════ 저장 ═════════ */
 function newState(name) {
-  return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true }, body: { en: 100, taste: 35, meals: 0, ate: [], shared: false } };
+  return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: randomLook(), body: { en: 100, taste: 35, meals: 0, ate: [], shared: false } };
 }
 function save() {
   if (!G || mode !== 'play' || busy) return; // 대화·장면 도중에는 저장하지 않아요 (장면이 끝나면 저장)
@@ -731,14 +739,11 @@ function updateWalkers(dt) {
   }
 }
 /* ── 장부: 평판·손맛·확장·도전 ── */
-function pickTraitPanel() {
-  return openPanel('나의 손맛은?', `<p>내 손이 가장 잘하는 것 하나를 골라요. (나중에 장부에서 바꿀 수 있어요)</p>` + Object.keys(TRAITS).map(k =>
-    `<div class="row"><span class="grow">${TRAITS[k].name}<br><small>${TRAITS[k].desc}</small></span><button class="btn" data-a="t" data-v="${k}">고르기</button></div>`).join(''),
-    (a, v, p) => { if (a === 't') { G.trait = v; Au.sfx('heart'); p.close(); } });
-}
 async function pickTrait() {
-  while (!G.trait) await pickTraitPanel();
-  toast(`나의 손맛 — ${TRAITS[G.trait].name}\n${TRAITS[G.trait].desc}`, 'heart', 5000);
+  if (!G.trait) G.trait = pickOne(Object.keys(TRAITS));
+  Au.sfx('heart');
+  await UI.narr(`내 손이 가장 잘하는 건…\n「${TRAITS[G.trait].name}」\n${TRAITS[G.trait].desc}`);
+  toast(`나의 손맛 — ${TRAITS[G.trait].name}\n장부에서 100닢으로 다시 뽑을 수 있어요.`, 'heart', 5000);
 }
 function openLedger() {
   const html = () => {
@@ -747,7 +752,7 @@ function openLedger() {
       <p>평판 <b>${G.rep}</b>${next !== undefined ? ` · 다음 별까지 ${next - G.rep}` : ' · 최고 등급'}<br>
       <small>한 그릇 대접할 때마다 평판 +1, 빨리 내면 +1 더.<br>지금은 한 번 영업에 손님 최대 ${4 + r * 2}명 · 빠른 대접 팁 ${(2 + r) * (G.trait === 'warm' ? 2 : 1)}닢 · 나만의 요리 ${Math.min(3, r)}칸</small></p>
       <div class="sec">나의 손맛</div>
-      ${G.trait ? `<div class="row"><span class="grow">${TRAITS[G.trait].name}<br><small>${TRAITS[G.trait].desc}</small></span><button class="btn" data-a="trait" ${G.coins < 100 ? 'disabled' : ''}>바꾸기 100닢</button></div>` : '<p>아직 정하지 않았어요. 첫 요리를 만들면 알게 돼요.</p>'}
+      ${G.trait ? `<div class="row"><span class="grow">${TRAITS[G.trait].name}<br><small>${TRAITS[G.trait].desc}</small></span><button class="btn" data-a="trait" ${G.coins < 100 ? 'disabled' : ''}>다시 뽑기 100닢</button></div>` : '<p>아직 정하지 않았어요. 첫 요리를 만들면 알게 돼요.</p>'}
       <div class="sec">몸 상태</div>
       <p>기운 <b>${G.body.en}</b>/100 · 밥맛 <b>${G.body.taste}</b>/100 — ${tasteWord()}<br>
       <small>· 기운: 채집·낚시·대접·먼 길에 빠지고, 내가 만든 요리를 먹거나 자면 차요. 25 아래면 걸음이 느려지고, 0이면 채집을 못 해요.<br>
@@ -762,7 +767,15 @@ function openLedger() {
       <div class="sec">지금까지</div><p>대접한 그릇 ${G.stats.served} · 맡겨 두고 판 그릇 ${G.stats.auto || 0} · 번 돈 ${G.stats.earned}닢 · 하루 최고 ${G.stats.best || 0}그릇</p>`;
   };
   return openPanel('장부', html(), (a, v, p) => {
-    if (a === 'trait' && G.coins >= 100 && confirm('100닢을 내고 손맛을 다시 고를까요?')) { G.coins -= 100; G.trait = null; p.close(); runScene(pickTrait); }
+    if (a === 'trait' && G.coins >= 100) {
+      p.close();
+      runScene(async () => {
+        if (await UI.choose(['100닢 내고 다시 뽑기', '그만두기']) !== 0) return;
+        const old = G.trait; G.coins -= 100;
+        do { G.trait = pickOne(Object.keys(TRAITS)); } while (G.trait === old);
+        await pickTrait();
+      });
+    }
   });
 }
 function openWorkshop() {
@@ -1534,6 +1547,8 @@ function boot() {
   GUEST_LOOKS.forEach((l, i) => { CHARS['guest' + i] = makeChar(l); });
   MAPS.village = buildVillage(); MAPS.shop = buildShop();
   map = MAPS.village;
+  $('#name').value = randomName();
+  $('#btn-reroll').addEventListener('click', e => { e.preventDefault(); let n; do { n = randomName(); } while (n === $('#name').value); $('#name').value = n; Au.sfx('blip'); });
   const sv = load();
   if (sv) $('#btn-continue').classList.remove('hide');
   $('#btn-continue').addEventListener('click', () => startGame(load(), false));
