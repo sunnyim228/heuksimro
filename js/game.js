@@ -1,9 +1,9 @@
 // 모락모락 — 솥골 식당 이야기 : 게임 엔진
-import { T, buildSprites, renderGround, makeChar, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
+import { T, buildSprites, renderGround, makeChar, makeAlien, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
 import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES, SHARE_LINES, NPC_DONE, TAG_NAME, tagsFor, MOODS, MOOD_MISS, BOND_STORIES } from './data.js';
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
-import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER } from './homestay.js';
+import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER, WORLD, HINTS, DEX_GROUPS } from './homestay.js';
 
 const $ = s => document.querySelector(s);
 const cvs = $('#game'), ctx = cvs.getContext('2d');
@@ -539,7 +539,18 @@ function openBook() {
       <div class="how">${tagLine(id)}</div>
       <div class="memo">"${r.memo}"<br>— ${r.from} · ${priceOf(id)}닢</div></div>`;
   }
-  if (Object.keys(G.dex || {}).length) h += `<p class="center"><button class="btn main" data-a="dex">레시피 도감 열기 (${DEX_ORDER.filter(id => dexLv(id)).length}/${DEX_ORDER.length})</button></p>`;
+  if (Object.keys(G.dex || {}).length) h += `<p class="center"><button class="btn main" data-a="dex">레시피 도감 열기 (${DEX_ORDER.filter(dexFound).length}/${DEX_ORDER.length})</button></p>`;
+  const worldFound = DEX_GROUPS.slice(1).flatMap(gr => gr[1]).filter(id => G.recipes.includes(id));
+  if (worldFound.length) {
+    h += `<div class="sec">찾아낸 세계 요리</div>`;
+    for (const id of worldFound) {
+      const r = RECIPES[id], n = servings(id);
+      h += `<div class="rcp"><h4><img class="ic" src="${iconURL(id)}">${r.name}<span class="can">${n > 0 ? `지금 ${n}그릇 가능` : '재료 부족'}</span></h4>
+        <div class="how">${COOKER_NAME[r.cooker]}에 ▸ ${r.ing.map(i => `<img class="ic s" src="${iconURL(i)}">${itemName(i)}`).join(' + ')}</div>
+        <div class="how">${tagLine(id)}</div>
+        <div class="memo">"${r.memo}"<br>— ${r.from} · ${priceOf(id)}닢</div></div>`;
+    }
+  }
   h += `<div class="sec">길에서 얻은 레시피</div>`;
   const got = TRAVEL_ORDER.filter(id => G.recipes.includes(id));
   for (const id of got) {
@@ -814,13 +825,17 @@ function openSettings() {
     p.set(html());
   });
 }
+function shopList() {
+  const extra = Object.keys(G.world || {}).filter(w => G.world[w]).flatMap(w => WORLD[w].items);
+  return [...new Set([...SHOP_LIST, ...extra])];
+}
 function openShop() {
   if (G.coins < 4 && stock('rice') === 0 && !G.flags.credit) {
     G.flags.credit = true; addItem('rice', 3); addItem('egg', 3);
     toast('이장님이 쌀과 달걀을 외상으로 쥐여 줬다. "나중에 밥으로 갚아라!"', 'rice', 4500);
   }
   const sellable = () => Object.keys(G.inv).filter(i => G.inv[i] > 0);
-  const html = () => `<p>"필요한 거 골라 봐라. 싸게 주마!" — 가진 돈 <b>${G.coins}</b>닢</p><div class="sec">사기</div>` + SHOP_LIST.map(id =>
+  const html = () => `<p>"필요한 거 골라 봐라. 싸게 주마!" — 가진 돈 <b>${G.coins}</b>닢</p><div class="sec">사기</div>` + shopList().map(id =>
     `<div class="row"><img class="ic" src="${iconURL(id)}"><span class="grow">${ITEMS[id].name} <small>(가진 것 ${inv(id)})</small></span><span>${buyPrice(id)}닢</span>
      <button class="btn" data-a="buy" data-v="${id}" ${G.coins < buyPrice(id) ? 'disabled' : ''}>사기</button></div>`).join('') +
     `<div class="sec">팔기 — 남는 재료나 요리</div>` + (sellable().length ? sellable().map(id =>
@@ -992,11 +1007,19 @@ function useCooker(c) {
   if (RECIPES[it]) return no('완성된 요리는 다시 넣을 수 없어요.');
   if (ITEMS[it] && ITEMS[it].chop) return no(`${itemName(it)}: 먼저 도마에서 손질해요.`);
   const next = [...c.contents, it];
-  const mine = G.recipes.filter(r => RECIPES[r].cooker === c.kind);
-  if (!mine.some(r => subMulti(next, RECIPES[r].ing))) return no(`지금 ${cname}에는 어울리지 않는 재료예요. (수첩을 확인해요)`);
+  const mine = [...G.recipes, ...discoverable()].filter(r => RECIPES[r].cooker === c.kind);
+  if (!mine.some(r => subMulti(next, RECIPES[r].ing))) return no(`이 조합으로는 ${cname}에서 아무것도 안 될 것 같아요. (수첩·도감의 단서를 봐요)`);
   c.contents = next; P.hands = null; Au.sfx('put');
   const full = mine.find(r => RECIPES[r].ing.length === next.length && subMulti(next, RECIPES[r].ing));
-  if (full) { c.cook = 0; c.making = full; Au.sfx('sizzle'); }
+  if (full) {
+    c.cook = 0; c.making = full; Au.sfx('sizzle');
+    if (!G.recipes.includes(full)) { // 새 요리 발견!
+      G.recipes.push(full); Au.sfx('page');
+      const w = RECIPES[full].world;
+      toast(`새 요리 발견! 「${RECIPES[full].name}」\n${w ? WORLD[w].name + ' 요리 — ' : ''}도감에 올랐고, 이제 손님도 주문해요.`, full, 6000);
+      checkChallenges();
+    }
+  }
 }
 function updateCookers(dt) {
   for (const c of MAPS.shop.things) {
@@ -1220,13 +1243,22 @@ async function arrive(v) {
   showVisitor(v);
   await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
   for (const line of v.hello) await UI.say('visitor', line);
+  G.world = G.world || {};
+  const w = WORLD[v.world];
+  if (w && !G.world[v.world]) {
+    G.world[v.world] = true;
+    await UI.say('visitor', w.tell);
+    for (const d of w.dishes) await UI.say('visitor', `"${HINTS[d]}"`);
+    await UI.narr(`이장님이 ${w.name}에서 온 재료를 만물상에 들여놓았다.\n${w.items.map(i => ITEMS[i].name).join(' · ')}`);
+    toast(`${w.name} 요리의 단서를 얻었어요\n도감의 「?」에서 단서를 다시 볼 수 있어요. 재료는 이장님 만물상에서.`, 'page', 7000);
+  }
 }
 async function startHomestay() {
   G.dex = G.dex || {};
   G.stay = { day: 1, len: YEAR_DAYS, year: 1, today: null, taught: false };
   G.up.stay = 1; G.step = 'homestay';
   await arrive(visitorOf(1));
-  await UI.say('ijang', `허허, 별에서 손님이 왔구나! 이 마을의 한 해는 스무여드레야. 계절마다 다른 별에서 손님이 온단다. ${G.name}, 식당 2층 빈방 내주거라.`);
+  await UI.say('ijang', `허허, 별에서 손님이 왔구나! …사람은 아니구먼. 그래도 배고픈 건 똑같겠지. 이 마을의 한 해는 스무여드레야. 계절마다 다른 별에서 손님이 온단다. ${G.name}, 식당 2층 빈방 내주거라.`);
   await UI.say('me', '좋아요. 매일 하나씩, 제대로 가르쳐 줄게요.');
   pickLesson();
   await UI.say('visitor', waitLine(RECIPES[G.stay.today].name));
@@ -1306,27 +1338,43 @@ async function yearEnd() {
     mode = 'title'; location.reload();
   }
 }
+function discoverable() { // 별손님이 알려 준 나라의 요리 중 아직 못 찾은 것
+  return Object.keys(G.world || {}).filter(w => G.world[w]).flatMap(w => WORLD[w].dishes).filter(r => !G.recipes.includes(r));
+}
+const dexFound = id => G.recipes.includes(id) || dexLv(id) > 0;
 function openDex() {
-  const found = () => DEX_ORDER.filter(id => dexLv(id)).length, stars = () => DEX_ORDER.reduce((t, id) => t + dexLv(id), 0);
-  const grid = () => `<p>도감 <b>${found()}</b>/${DEX_ORDER.length} · 별 <b>${stars()}</b>/${DEX_ORDER.length * 3}<br>
-    <small>서로 다른 별손님이 맛볼수록 별이 올라요. ★ 실제 레시피 · ★★ 요령 · ★★★ 변주. 별 하나 늘 때마다 요리 값 +10%.</small></p>
-    <div class="grid">${DEX_ORDER.map(id => {
-      const lv = dexLv(id);
-      return lv ? `<button class="cell" data-a="see" data-v="${id}"><img class="ic" src="${iconURL(id)}"><br>${RECIPES[id].name}<br><span style="color:var(--accent)">${dexStars(lv)}</span></button>`
-        : `<div class="cell" style="opacity:.55"><span style="font-size:1.7rem;line-height:2.2rem">?</span><br>${G.recipes.includes(id) ? RECIPES[id].name : '???'}<br>☆☆☆</div>`;
-    }).join('')}</div>`;
+  const found = () => DEX_ORDER.filter(dexFound).length, stars = () => DEX_ORDER.reduce((t, id) => t + dexLv(id), 0);
+  const cellOf = (id, open) => {
+    const lv = dexLv(id);
+    if (dexFound(id)) return `<button class="cell" data-a="see" data-v="${id}"><img class="ic" src="${iconURL(id)}"><br>${RECIPES[id].name}<br><span style="color:var(--accent)">${dexStars(lv)}</span></button>`;
+    if (open && HINTS[id]) return `<button class="cell" data-a="hint" data-v="${id}" style="opacity:.8"><span style="font-size:1.7rem;line-height:2.2rem">?</span><br>단서 보기<br>☆☆☆</button>`;
+    return `<div class="cell" style="opacity:.45"><span style="font-size:1.7rem;line-height:2.2rem">?</span><br>???<br>☆☆☆</div>`;
+  };
+  const grid = () => `<p>찾은 요리 <b>${found()}</b>/${DEX_ORDER.length} · 별 <b>${stars()}</b>/${DEX_ORDER.length * 3}<br>
+    <small>요리는 직접 찾아내요. 별손님이 들려준 단서대로 부엌에서 재료를 조합하면 「새 요리 발견!」. 찾은 요리를 서로 다른 별손님에게 가르칠수록 별이 올라요 (★ 실제 레시피 · ★★ 요령 · ★★★ 변주, 별마다 값 +10%).</small></p>` +
+    DEX_GROUPS.map(([title, ids, w]) => {
+      const open = !w || (G.world && G.world[w]);
+      if (w && !open && !ids.some(dexFound)) return `<div class="sec">${title} — 아직 이 나라를 들른 별손님이 없어요</div>`;
+      return `<div class="sec">${title}${w ? ` · ${VISITORS.find(v => v.id === WORLD[w].visitor).name}가 들려준 나라` : ''}</div><div class="grid">${ids.map(id => cellOf(id, open)).join('')}</div>`;
+    }).join('');
+  const hint = id => `<p><button class="btn" data-a="back">◀ 도감으로</button></p>
+    <div class="rcp"><h4><span style="font-size:1.4rem">?</span> 아직 찾지 못한 ${WORLD[RECIPES[id].world].name} 요리</h4>
+    <div class="how">${VISITORS.find(v => v.id === WORLD[RECIPES[id].world].visitor).name}의 단서: "${HINTS[id]}"</div>
+    <div class="memo">재료는 만물상에서 살 수 있어요. 맞는 조합을 조리 도구에 넣으면 찾아내요.</div></div>`;
   const detail = id => {
-    const r = REAL[id], lv = dexLv(id), who = (G.dex[id] || []).map(vid => (VISITORS.find(v => v.id === vid) || {}).name).filter(Boolean);
+    const r = REAL[id], lv = dexLv(id), who = ((G.dex || {})[id] || []).map(vid => (VISITORS.find(v => v.id === vid) || {}).name).filter(Boolean), gr = RECIPES[id];
     return `<p><button class="btn" data-a="back">◀ 도감으로</button></p>
-      <div class="rcp"><h4><img class="ic" src="${iconURL(id)}">${RECIPES[id].name}<span class="can" style="color:var(--accent)">${dexStars(lv)}</span></h4>
-      <div class="memo">맛본 별손님: ${who.join(', ')} · 지금 값 ${priceOf(id)}닢</div></div>
-      <div class="sec">★ 실제 레시피 (2인분)</div><div class="rcp"><div class="how">재료: ${r.ing.join(', ')}</div><div class="memo">${r.steps.map((t, i) => `${i + 1}. ${t}`).join('<br>')}</div></div>
+      <div class="rcp"><h4><img class="ic" src="${iconURL(id)}">${gr.name}<span class="can" style="color:var(--accent)">${dexStars(lv)}</span></h4>
+      <div class="how">${COOKER_NAME[gr.cooker]}에 ▸ ${gr.ing.map(i => itemName(i)).join(' + ')}</div>
+      <div class="memo">${who.length ? `맛본 별손님: ${who.join(', ')}` : '아직 맛본 별손님이 없어요'} · 지금 값 ${priceOf(id)}닢</div></div>
+      <div class="sec">★ 실제 레시피 (2인분)</div>${lv >= 1 ? `<div class="rcp"><div class="how">재료: ${r.ing.join(', ')}</div><div class="memo">${r.steps.map((t, i) => `${i + 1}. ${t}`).join('<br>')}</div></div>` : `<div class="rcp torn">별손님 한 명에게 가르쳐 주면 열려요</div>`}
       <div class="sec">★★ 요령</div>${lv >= 2 ? `<div class="rcp"><div class="how">${DEX_MORE[id].tip}</div></div>` : `<div class="rcp torn">다른 별손님 한 명이 더 맛보면 열려요</div>`}
       <div class="sec">★★★ 변주</div>${lv >= 3 ? `<div class="rcp"><div class="how">${DEX_MORE[id].vary}</div></div>` : `<div class="rcp torn">세 번째 별손님이 맛보면 열려요</div>`}
       <p><small>일반적인 가정식 기준이에요. 집집마다 간과 순서는 조금씩 달라요.</small></p>`;
   };
   return openPanel('레시피 도감', grid(), (a, v, p) => {
     if (a === 'see') p.set(detail(v));
+    if (a === 'hint') p.set(hint(v));
     if (a === 'back') p.set(grid());
   });
 }
@@ -1670,6 +1718,7 @@ function startGame(state, isNew) {
   G.bank = G.bank || { dep: 0, loan: 0 }; G.craft = G.craft || []; G.wear = G.wear || []; G.event = G.event || null; G.traveled = !!G.traveled;
   G.look = G.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
   G.dex = G.dex || {};
+  G.world = G.world || {};
   if (G.book) { for (const id of G.book) G.dex[id] = G.dex[id] || ['eunha']; delete G.book; } // 예전 '진짜 레시피북'을 도감으로
   G.body = G.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
   for (const k of Object.keys(RECIPES)) if (RECIPES[k].custom) delete RECIPES[k];
@@ -1696,7 +1745,7 @@ function boot() {
   resize();
   SPR = buildSprites();
   for (const k in LOOKS) CHARS[k] = makeChar(LOOKS[k]);
-  for (const v of VISITORS) { CHARS[v.id] = makeChar(v.look); NPC_NAME[v.id] = v.name; }
+  for (const v of VISITORS) { CHARS[v.id] = makeAlien(v.alien); NPC_NAME[v.id] = v.name; }
   CHARS.visitor = CHARS.eunha; NPC_NAME.visitor = '은하';
   GUEST_LOOKS.forEach((l, i) => { CHARS['guest' + i] = makeChar(l); });
   MAPS.village = buildVillage(); MAPS.shop = buildShop();
