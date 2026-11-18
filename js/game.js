@@ -1,8 +1,9 @@
 // 모락모락 — 솥골 식당 이야기 : 게임 엔진
 import { T, buildSprites, renderGround, makeChar, portrait, itemIcon, iconURL, puff, rng, registerDish } from './art.js';
 import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES, SHARE_LINES, NPC_DONE, TAG_NAME, tagsFor, MOODS, MOOD_MISS, BOND_STORIES } from './data.js';
-import { makeStory, GOALS } from './story.js';
+import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
+import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, EUNHA_LINES } from './homestay.js';
 
 const $ = s => document.querySelector(s);
 const cvs = $('#game'), ctx = cvs.getContext('2d');
@@ -82,6 +83,7 @@ function buildVillage() {
   // 사람들
   const npc = (id, x, y) => { add(m, { type: 'npc', id, x, y, act: true, tall: true }); keep(x - 1, y - 1, x + 1, y + 1); };
   npc('ijang', 17, 16); npc('geumja', 11, 27); npc('sori', 9, 20); npc('doyun', 34, 8); npc('captain', 23, 35);
+  npc('eunha', 30, 19); m.things[m.things.length - 1].own = 'stay';
 
   // 소품
   const deco = (spr, x, y, o = {}) => { keep(x, y, x + (o.w || 1) - 1, y); return add(m, { type: o.type || 'deco', x, y, spr, ...o }); };
@@ -417,7 +419,7 @@ function refreshHUD() {
   ensureReqs();
   const h = Math.floor(G.time / 60), mi = Math.floor(G.time % 60 / 10) * 10;
   const ap = h < 12 ? '오전' : '오후', hh = h % 12 === 0 ? 12 : h % 12;
-  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
+  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>은하 홈스테이 D-${Math.max(0, G.stay.len - G.stay.day)} · ${seasonOf(G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
   const goal = GOALS[G.step] || '';
   $('#goal').classList.toggle('hide', !goal || !!svc);
   $('#goal .txt').textContent = goal;
@@ -535,6 +537,15 @@ function openBook() {
       <div class="how">${COOKER_NAME[r.cooker]}에 ▸ ${r.ing.map(i => `<img class="ic s" src="${iconURL(i)}">${itemName(i)}`).join(' + ')}</div>
       <div class="how">${tagLine(id)}</div>
       <div class="memo">"${r.memo}"<br>— ${r.from} · ${priceOf(id)}닢</div></div>`;
+  }
+  if (G.book && G.book.length) {
+    h += `<div class="sec">진짜 레시피북 (${G.book.length}장) — 은하에게 가르쳐 준 것</div><p><small>실제로 만들 수 있는 2인분 가정식이에요. 집집마다 간과 순서는 조금씩 달라요.</small></p>`;
+    for (const id of G.book) {
+      const r = REAL[id]; if (!r) continue;
+      h += `<div class="rcp"><h4><img class="ic" src="${iconURL(id)}">${RECIPES[id] ? RECIPES[id].name : id}</h4>
+        <div class="how">재료: ${r.ing.join(', ')}</div>
+        <div class="memo">${r.steps.map((t, i) => `${i + 1}. ${t}`).join('<br>')}</div></div>`;
+    }
   }
   h += `<div class="sec">길에서 얻은 레시피</div>`;
   const got = TRAVEL_ORDER.filter(id => G.recipes.includes(id));
@@ -860,13 +871,14 @@ function checkProgress() {
   checkChallenges();
   refreshHUD();
 }
-const QUEST_NPC = { gather: 'ijang', q_geumja: 'geumja', q_sori: 'sori', q_doyun: 'doyun', q_captain: 'captain', q_ijang2: 'ijang' };
+const QUEST_NPC = { homestay: 'eunha', gather: 'ijang', q_geumja: 'geumja', q_sori: 'sori', q_doyun: 'doyun', q_captain: 'captain', q_ijang2: 'ijang' };
 
 /* ═════════ 상호작용 ═════════ */
 function interact(th) {
   if (busy || !th) return;
   switch (th.type) {
-    case 'npc': return runScene(async () => {
+    case 'npc': if (th.id === 'eunha') return runScene(talkEunha);
+      return runScene(async () => {
       const dishes = Object.keys(G.inv).filter(i => RECIPES[i] && G.inv[i] > 0);
       if (opened() && !G.body.shared && dishes.length && QUEST_NPC[G.step] !== th.id && STEPS.indexOf(G.step) > STEPS.indexOf(NPC_DONE[th.id])) {
         if (await UI.choose(['같이 밥을 먹는다', '이야기한다']) === 0) return shareMeal(th.id, dishes);
@@ -1180,6 +1192,89 @@ async function sleep() {
   if (news) toast(news, null, 6000);
   if (G.step === 'sleep1') { await UI.black(false); await story.scenes.morning2(); }
   else await UI.black(false);
+  await homestayMorning();
+}
+
+/* ═════════ 2부: 별손님 홈스테이 ═════════ */
+const LEGACY = 'morak-legacy';
+function loadLegacy() { try { return JSON.parse(localStorage.getItem(LEGACY)) || { book: [], runs: 0 }; } catch (e) { return { book: [], runs: 0 }; } }
+function saveLegacy(l) { try { localStorage.setItem(LEGACY, JSON.stringify(l)); } catch (e) { /* 저장 공간이 없으면 건너뜀 */ } }
+function pickLesson() {
+  const known = G.recipes.filter(r => REAL[r]);
+  const fresh = known.filter(r => !G.book.includes(r));
+  const pool = fresh.length ? fresh : known;
+  const season = SEASON_DISHES[seasonOf(G.stay.day)];
+  const inSeason = pool.filter(r => season.includes(r));
+  G.stay.today = pickOne(inSeason.length ? inSeason : pool);
+  G.stay.taught = false;
+}
+async function startHomestay() {
+  await UI.narr('저녁 막차가 들어왔다.\n내린 사람은 한 명. 별빛 같은 머리카락에, 짐은 가방 하나뿐이었다.');
+  await UI.say('eunha', '안녕하세요. 저는 은하예요. 아주 먼 데서 왔어요. 우리 별에는… 맛이라는 게 없어요.');
+  await UI.say('eunha', '이 마을에 오면 밥을 배울 수 있다고 들었어요. 한 해만 머물게 해 줄래요?');
+  await UI.say('ijang', `허허, 홈스테이란다! ${G.name}, 식당 2층 빈방 내주거라. 이 마을의 한 해는 금방 간다. 스무여드레면 사계절이 한 바퀴지.`);
+  await UI.say('me', '좋아요. 대신 매일 하나씩, 제대로 가르쳐 줄게요.');
+  G.stay = { day: 1, len: YEAR_DAYS, year: 1, today: null, taught: false };
+  G.up.stay = 1; G.step = 'homestay';
+  pickLesson();
+  await UI.say('eunha', EUNHA_LINES.waiting(RECIPES[G.stay.today].name));
+  toast('은하가 식당 앞에서 기다려요.\n궁금해하는 요리를 만들어 가방에 넣고 말을 걸어요. 같이 먹으며 가르쳐 주면 진짜 레시피북에 한 장씩 쌓여요.', 'page', 8000);
+}
+async function homestayMorning() {
+  if (G.step === 'epilogue' && !G.stay && !G.flags.stayDone) return startHomestay();
+  if (!G.stay) return;
+  G.stay.day++;
+  if (G.stay.day > G.stay.len) return farewell();
+  const s0 = seasonOf(G.stay.day - 1), s1 = seasonOf(G.stay.day);
+  if (s0 !== s1) await UI.narr(`솥골에 ${s1}이 왔다.\n은하가 창문에 코를 대고 바깥 냄새를 맡고 있다.`);
+  pickLesson();
+  await UI.say('eunha', EUNHA_LINES.waiting(RECIPES[G.stay.today].name));
+}
+async function talkEunha() {
+  const st = G.stay;
+  if (!st) return UI.say('eunha', '…');
+  if (st.taught) return UI.say('eunha', EUNHA_LINES.done);
+  const id = st.today, name = RECIPES[id].name;
+  if (inv(id) <= 0) {
+    if (Math.random() < 0.4) await UI.say('eunha', pickOne(EUNHA_LINES.idle));
+    return UI.say('eunha', EUNHA_LINES.waiting(name));
+  }
+  if (await UI.choose([`「${name}」로 같이 먹으며 가르쳐 준다`, '아직은…']) !== 0) return;
+  addItem(id, -1);
+  const r = REAL[id];
+  await UI.narr(`은하와 마주 앉아 ${josa(name, '을/를')} 나눠 먹었다.`);
+  await UI.say('eunha', r.q);
+  await UI.narr(`재료(2인분)\n${r.ing.join(' · ')}`);
+  for (let i = 0; i < r.steps.length; i++) await UI.narr(`${i + 1}. ${r.steps[i]}`);
+  const fresh = !G.book.includes(id);
+  if (fresh) G.book.push(id);
+  st.taught = true;
+  feed(id, true); gainRep(2);
+  await UI.say('eunha', fresh ? '적었어요. 언젠가 우리 별에 가서도 이걸 만들 수 있을까요?' : '두 번째니까 더 잘 알겠어요. 손이 기억하는 거예요?');
+  if (fresh) toast(`진짜 레시피북 ${G.book.length}장 — 「${name}」\n수첩에서 실제 레시피를 볼 수 있어요.`, 'page', 5000);
+  Au.sfx('page');
+}
+async function farewell() {
+  const st = G.stay;
+  await UI.narr(`이 마을의 한 해가 다 갔다.\n은하가 가방 하나를 다시 멨다.`);
+  await UI.say('eunha', `${st.year > 1 ? `${st.year}번째 ` : ''}한 해 동안 ${G.book.length}가지를 배웠어요. 처음 왔을 땐 '맛있다'가 무슨 말인지 몰랐어요.`);
+  await UI.say('eunha', '이제 알아요. 누가 나를 위해 불 앞에 서 있었다는 뜻이에요.');
+  const c = await UI.choose(['한 해 더 머물러 달라고 한다', '배웅하고, 이 마을에서 계속 지낸다', '배웅하고 새로 시작한다 (레시피북은 이어져요)']);
+  if (c === 0) {
+    await UI.say('eunha', '정말요? …그럼 이번엔 제가 먼저 밥 짓는 걸 도와도 돼요?');
+    st.year++; st.day = 1; pickLesson();
+    await UI.say('eunha', EUNHA_LINES.waiting(RECIPES[st.today].name));
+    return;
+  }
+  await UI.narr('막차 문이 닫히기 전, 은하가 손을 흔들었다.\n"밥 먹었어요?"\n…그게 그 아이의 작별 인사였다.');
+  const l = loadLegacy();
+  l.book = [...new Set([...l.book, ...G.book])]; l.runs = (l.runs || 0) + 1; saveLegacy(l);
+  G.stay = null; G.up.stay = 0; G.flags.stayDone = true; G.step = 'after_stay';
+  if (c === 2) {
+    await UI.narr(`진짜 레시피북 ${l.book.length}장을 챙겼다.\n새로운 이야기가 시작된다.`);
+    try { localStorage.removeItem(SAVE); } catch (e) { /* 무시 */ }
+    mode = 'title'; location.reload();
+  }
 }
 
 /* ═════════ 입력 ═════════ */
@@ -1520,6 +1615,7 @@ function startGame(state, isNew) {
   G.up = G.up || {}; G.rep = G.rep || 0; G.custom = G.custom || []; G.done = G.done || {}; if (G.trait === undefined) G.trait = null;
   G.bank = G.bank || { dep: 0, loan: 0 }; G.craft = G.craft || []; G.wear = G.wear || []; G.event = G.event || null; G.traveled = !!G.traveled;
   G.look = G.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
+  G.book = G.book || [];
   G.body = G.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
   for (const k of Object.keys(RECIPES)) if (RECIPES[k].custom) delete RECIPES[k];
   G.custom.forEach(registerCustom);
@@ -1549,17 +1645,18 @@ function boot() {
   map = MAPS.village;
   $('#name').value = randomName();
   $('#btn-reroll').addEventListener('click', e => { e.preventDefault(); let n; do { n = randomName(); } while (n === $('#name').value); $('#name').value = n; Au.sfx('blip'); });
+  const legacy = loadLegacy();
   const sv = load();
   if (sv) $('#btn-continue').classList.remove('hide');
   $('#btn-continue').addEventListener('click', () => startGame(load(), false));
   $('#btn-new').addEventListener('click', () => {
     if (load() && !confirm('저장된 진행이 있어요. 지우고 새로 시작할까요?')) return;
     const name = ($('#name').value || '').trim().slice(0, 6) || '하루';
-    startGame(newState(name), true);
+    const st = newState(name); st.book = loadLegacy().book.slice(); startGame(st, true);
   });
   if ('serviceWorker' in navigator && !window.__TOSS__) navigator.serviceWorker.register('sw.js').catch(() => {});
   addEventListener('visibilitychange', () => { if (document.hidden) save(); else welcomeBack(); });
-  $('#greet').textContent = greeting();
+  $('#greet').textContent = greeting() + (legacy.book.length ? `\n진짜 레시피북 ${legacy.book.length}장을 이어 받아요 · 은하와 ${legacy.runs}번 작별했어요` : '');
   addEventListener('pagehide', save);
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
