@@ -5,7 +5,7 @@ import { cpSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 const out = 'dist';
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out);
-cpSync('js', `${out}/js`, { recursive: true });
+cpSync('js', `${out}/js`, { recursive: true, filter: s => !s.endsWith('_template.js') }); // 새 화 만들기 틀은 빼요
 cpSync('fonts', `${out}/fonts`, { recursive: true });
 
 // 토스 안에서 도는 판이라는 표시. 게임은 이 표시가 있으면 바깥으로 나가는 링크를 숨겨요.

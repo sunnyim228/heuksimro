@@ -5,9 +5,12 @@
   "description": "모락모락 — 솥골 식당 이야기",
   "scripts": {
     "build:toss": "node tools/build-toss.mjs && ait build",
-    "serve": "python3 -m http.server 8000"
+    "serve": "python3 -m http.server 8000",
+    "test": "node tests/run.mjs"
   },
   "devDependencies": {
-    "@apps-in-toss/web-framework": "3.10.0"
-  }
+    "@apps-in-toss/web-framework": "3.10.0",
+    "playwright": "1.63.0"
+  },
+  "type": "module"
 }
