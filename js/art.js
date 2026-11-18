@@ -349,20 +349,6 @@ const ICON_DRAW = {
   baechujeon: g => { plate(g); ell(g, '#dfe39a', 6, 7, 3, 2); R(g, '#f4f7e0', 5, 6, 3, 1); R(g, '#c78f3c', 3, 7); R(g, '#c78f3c', 9, 8); R(g, '#8fc45a', 7, 8, 2, 1); },
   spicy_fish: g => bowl(g, '#4d4038', '#c4553f', [[4, 5, '#84adcc', 2], [7, 5, '#f8f5ec'], [6, 6, '#f8f5ec', 2], [8, 6, '#d8412f']]),
   abalone_juk: g => bowl(g, '#f1e9d6', '#f3ecc8', [[4, 5, '#7d8a94', 2], [7, 5, '#d9a13c'], [6, 6, '#b8d8d0', 2]]),
-  pasta: g => { for (let i = 0; i < 5; i++) R(g, '#f2d58c', 2 + i * 2, 1, 1, 10); R(g, '#d9b45f', 2, 5, 9, 1); R(g, '#c4553f', 1, 9, 11, 2); },
-  tomato: g => { ell(g, '#e04a3a', 6, 7, 4, 3); R(g, '#f27c6a', 4, 5, 2, 1); R(g, '#5fa644', 5, 2, 3, 2); R(g, '#3f8a3a', 6, 1, 1, 2); },
-  cheese: g => { R(g, '#f7d15a', 2, 4, 9, 6); R(g, '#e3b83c', 2, 9, 9, 1); R(g, '#fbe48f', 3, 3, 7, 1); R(g, '#d9a92a', 4, 6, 2, 2); R(g, '#d9a92a', 8, 5, 1, 1); },
-  ricenoodle: g => { for (let i = 0; i < 4; i++) R(g, '#fbf6ea', 2, 3 + i * 2, 8, 1); R(g, '#e4dccb', 2, 4, 8, 1); R(g, '#c4553f', 9, 2, 2, 8); },
-  curry: g => { R(g, '#e8a92c', 3, 4, 6, 6); R(g, '#c98a1a', 8, 4, 1, 6); R(g, '#8c5d3c', 2, 3, 8, 1); R(g, '#8c5d3c', 5, 1, 2, 2); R(g, '#f7d15a', 4, 6, 2, 2); },
-  tortilla: g => { ell(g, '#ecd29a', 6, 6, 5, 4); R(g, '#c9a463', 4, 4, 1, 1); R(g, '#c9a463', 8, 7, 1, 1); R(g, '#c9a463', 5, 8, 1, 1); R(g, '#f7e6bd', 4, 5, 2, 1); },
-  tomato_pasta: g => { plate(g); ell(g, '#f2d58c', 6, 7, 3, 2); R(g, '#d9b45f', 4, 6, 5, 1); R(g, '#e04a3a', 5, 6, 3, 2); R(g, '#f7d15a', 6, 5, 1, 1); },
-  risotto: g => { plate(g); ell(g, '#f6ecd0', 6, 7, 3, 2); R(g, '#a9683f', 4, 6, 2, 1); R(g, '#a9683f', 7, 7, 2, 1); R(g, '#f7d15a', 6, 6, 1, 1); },
-  pad_thai: g => { plate(g); ell(g, '#e8c27a', 6, 7, 3, 2); R(g, '#d9a050', 4, 7, 5, 1); R(g, '#f4dc86', 5, 6, 2, 1); R(g, '#5fa644', 8, 6, 1, 1); R(g, '#8c5d3c', 6, 8, 1, 1); },
-  tom_yum: g => bowl(g, '#4d4038', '#e8763a', [[4, 5, '#e04a3a', 2], [7, 5, '#ead4b2'], [6, 6, '#a9683f', 2], [8, 6, '#5fa644']]),
-  potato_curry: g => bowl(g, '#4d4038', '#e8a92c', [[4, 5, '#f2dea0', 2], [7, 5, '#fbf6e8'], [6, 6, '#f2dea0', 2]]),
-  fish_curry: g => bowl(g, '#4d4038', '#d9772a', [[4, 5, '#f8f5ec', 2], [7, 5, '#e04a3a'], [6, 6, '#f8f5ec', 2]]),
-  quesadilla: g => { plate(g); R(g, '#ecd29a', 3, 5, 7, 3); R(g, '#c9a463', 3, 7, 7, 1); R(g, '#f7d15a', 4, 8, 2, 1); R(g, '#f7d15a', 7, 8, 1, 1); },
-  taco: g => { plate(g); R(g, '#ecd29a', 3, 6, 7, 2); R(g, '#c9a463', 3, 7, 7, 1); R(g, '#bfe08a', 4, 5, 2, 1); R(g, '#f8f5ec', 6, 5, 2, 1); R(g, '#e04a3a', 8, 5, 1, 1); },
   // 요리
   egg_rice: g => { plate(g); ell(g, '#f4dc86', 6, 6, 3, 2); R(g, '#fff3c2', 5, 5, 2, 1); R(g, '#5fa644', 4, 6); R(g, '#5fa644', 7, 5); R(g, '#5fa644', 8, 7); R(g, '#f0a13c', 6, 7); },
   doenjang_jjigae: g => bowl(g, '#5a4a44', '#b9793f', [[4, 5, '#fdfaf0', 2], [7, 5, '#5fa644'], [8, 6, '#fdfaf0'], [5, 6, '#5fa644']]),
@@ -382,7 +368,7 @@ const ICON_DRAW = {
   page: g => { R(g, '#fbf3dc', 3, 1, 7, 10); R(g, '#e3d6b4', 9, 1, 1, 10); R(g, '#a8794f', 4, 3, 4, 1); R(g, '#a8794f', 4, 5, 4, 1); R(g, '#a8794f', 4, 7, 3, 1); },
   rod: g => { for (let i = 0; i < 9; i++) R(g, '#a5754a', 2 + i, 10 - i, 1, 1); R(g, '#ddd', 10, 2, 1, 5); R(g, '#e25c5c', 9, 7, 2, 2); },
 };
-const MAINCOL = { rice: '#fbf6e8', egg: '#f4dc86', tofu: '#fdfaf0', doenjang: '#b9793f', pa: '#5fa644', mu: '#f8f5ec', gamja: '#ecc56c', mushroom: '#a9683f', namul: '#7cc05a', clam: '#ead4b2', miyeok: '#2f6b4f', fish: '#84adcc', cabbage: '#bfe08a', chili: '#d8412f', sesame: '#d9a13c', abalone: '#b8d8d0', dried_mushroom: '#6b4129', mu_dried: '#ead9a8', dried_fish: '#c9a36a', pasta: '#f2d58c', tomato: '#e04a3a', cheese: '#f7d15a', ricenoodle: '#fbf6ea', curry: '#e8a92c', tortilla: '#ecd29a' };
+const MAINCOL = { rice: '#fbf6e8', egg: '#f4dc86', tofu: '#fdfaf0', doenjang: '#b9793f', pa: '#5fa644', mu: '#f8f5ec', gamja: '#ecc56c', mushroom: '#a9683f', namul: '#7cc05a', clam: '#ead4b2', miyeok: '#2f6b4f', fish: '#84adcc', cabbage: '#bfe08a', chili: '#d8412f', sesame: '#d9a13c', abalone: '#b8d8d0', dried_mushroom: '#6b4129', mu_dried: '#ead9a8', dried_fish: '#c9a36a' };
 // 나만의 요리: 재료 색으로 그릇을 그려요 (남색 그릇/남색 테두리가 '내 요리' 표시)
 export function registerDish(id, cooker, ings) {
   const c = ings.map(i => MAINCOL[i.replace(/_c$/, '')] || '#cccccc'), c1 = c[1] || c[0], c2 = c[2] || c1;
@@ -390,6 +376,11 @@ export function registerDish(id, cooker, ings) {
     ? g => { plate(g); R(g, '#3d5a8c', 2, 10, 9, 1); ell(g, c[0], 6, 6, 3, 2); R(g, c1, 4, 6, 2, 1); R(g, c2, 7, 5, 2, 1); R(g, c1, 7, 7, 1, 1); }
     : g => bowl(g, '#3d5a8c', c[0], [[4, 5, c1, 2], [7, 5, c2], [6, 6, c1], [8, 6, c2]]);
   delete iconCache[id]; delete urlCache[id];
+}
+// 연재 화 파일이 그림을 등록하는 곳. fn(g, { R, ell, plate, bowl, shade })
+export function registerIcon(id, fn, color) {
+  if (fn) ICON_DRAW[id] = g => fn(g, { R, ell, plate, bowl, shade });
+  if (color) MAINCOL[id] = color;
 }
 const iconCache = {};
 export function itemIcon(id) {

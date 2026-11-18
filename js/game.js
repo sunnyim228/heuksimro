@@ -3,11 +3,14 @@ import { T, buildSprites, renderGround, makeChar, makeAlien, portrait, itemIcon,
 import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES, SHARE_LINES, NPC_DONE, TAG_NAME, tagsFor, MOODS, MOOD_MISS, BOND_STORIES } from './data.js';
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
+import { EPISODES } from './episodes/index.js'; // 연재 화들을 먼저 등록해요
 import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER, WORLD, HINTS, DEX_GROUPS } from './homestay.js';
 
 const $ = s => document.querySelector(s);
 const cvs = $('#game'), ctx = cvs.getContext('2d');
 const SAVE = 'morak-save-v1';
+// 자동 테스트용: 주소에 ?test 를 붙이면 조리·손질만 빨라져요 (일반 플레이에는 영향 없음)
+const TEST_SPEED = /[?&]test\b/.test(location.search) ? 25 : 1;
 const D4 = [[0, 1], [0, -1], [-1, 0], [1, 0]];
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
@@ -374,8 +377,38 @@ function randomLook() {
 
 /* ═════════ 저장 ═════════ */
 function newState(name) {
-  return { v: 1, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: randomLook(), body: { en: 100, taste: 35, meals: 0, ate: [], shared: false } };
+  return { v: SAVE_VERSION, name: name || '하루', day: 1, time: 8 * 60, coins: 10, inv: {}, recipes: [], mem: [], flags: {}, step: 'intro', map: 'village', x: 42, y: 17, taken: {}, fishLeft: 5, servedToday: false, stats: { served: 0, earned: 0 }, up: {}, rep: 0, trait: null, custom: [], done: {}, bank: { dep: 0, loan: 0 }, craft: [], reqs: [], event: null, traveled: false, wear: [], look: randomLook(), body: { en: 100, taste: 35, meals: 0, ate: [], shared: false } };
 }
+/* 저장 형식이 바뀔 때마다 SAVE_VERSION 을 한 칸 올리고, MIGRATIONS 에 "앞 버전 → 다음 버전" 변환을 하나 더해요.
+   불러올 때 낮은 버전부터 차례로 변환하니, 아무리 오래된 저장도 이어서 할 수 있어요. */
+const SAVE_VERSION = 2;
+const BACKUP = 'morak-save-backup';
+function fillDefaults(d) { // 기능이 늘며 생긴 칸을 채워요. 여러 번 해도 결과가 같아요.
+  d.stats = d.stats || { served: 0, earned: 0 };
+  d.up = d.up || {}; d.rep = d.rep || 0; d.custom = d.custom || []; d.done = d.done || {}; if (d.trait === undefined) d.trait = null;
+  d.bank = d.bank || { dep: 0, loan: 0 }; d.craft = d.craft || []; d.wear = d.wear || []; d.event = d.event || null; d.traveled = !!d.traveled;
+  d.look = d.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
+  d.dex = d.dex || {}; d.world = d.world || {}; d.met = d.met || [];
+  if (d.book) { for (const id of d.book) d.dex[id] = d.dex[id] || ['eunha']; delete d.book; } // 예전 '진짜 레시피북'을 도감으로
+  d.body = d.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
+  if (!d.rep && d.stats.served) d.rep = d.stats.served;
+  d.reqs = d.reqs || []; d.flags = d.flags || {}; d.inv = d.inv || {}; d.recipes = d.recipes || [];
+  return d;
+}
+const MIGRATIONS = {
+  1: d => { fillDefaults(d); if (d.stay && !d.met.length) d.met = ['eunha']; d.v = 2; }, // v1: 기능을 붙여 가던 시절의 저장
+};
+function upgradeSave(d) {
+  while (d.v < SAVE_VERSION) { const m = MIGRATIONS[d.v]; if (!m) return null; m(d); }
+  return d;
+}
+function parseSave(str) {
+  try { const d = JSON.parse(str); if (!d || typeof d.v !== 'number' || d.v > SAVE_VERSION || !d.name) return null; return upgradeSave(d); }
+  catch (e) { return null; }
+}
+const encodeSave = s => btoa(unescape(encodeURIComponent(s)));
+const decodeSave = s => { s = s.trim(); if (s.startsWith('{')) return s; try { return decodeURIComponent(escape(atob(s))); } catch (e) { return ''; } };
+let saveWarned = false;
 function save() {
   if (!G || mode !== 'play' || busy) return; // 대화·장면 도중에는 저장하지 않아요 (장면이 끝나면 저장)
   G.seenAt = Date.now();
@@ -383,9 +416,15 @@ function save() {
   for (const id of looseItems()) invAll[id] = (invAll[id] || 0) + 1;
   // 영업 중에 닫으면 가게 안 문 앞에서 다시 시작해요
   const data = { ...G, inv: invAll, map: map.name, x: svc ? 7 : P.x, y: svc ? 9 : P.y };
-  try { localStorage.setItem(SAVE, JSON.stringify(data)); } catch (e) { /* 저장 공간이 없으면 건너뜀 */ }
+  data.v = SAVE_VERSION;
+  try { localStorage.setItem(SAVE, JSON.stringify(data)); saveWarned = false; }
+  catch (e) { if (!saveWarned) { saveWarned = true; toast('저장하지 못했어요. 기기 저장 공간을 확인하고, 설정에서 백업 코드를 받아 두세요.', null, 6000); } }
 }
-function load() { try { const d = JSON.parse(localStorage.getItem(SAVE)); return d && d.v === 1 ? d : null; } catch (e) { return null; } }
+function load() { // 저장이 깨졌으면 어제 아침 백업으로
+  let d = null;
+  try { d = parseSave(localStorage.getItem(SAVE)) || parseSave(localStorage.getItem(BACKUP)); } catch (e) { d = null; }
+  return d;
+}
 
 /* ═════════ UI: 알림 · 말풍선 ═════════ */
 function toast(text, icon, ms = 3200) {
@@ -419,7 +458,7 @@ function refreshHUD() {
   ensureReqs();
   const h = Math.floor(G.time / 60), mi = Math.floor(G.time % 60 / 10) * 10;
   const ap = h < 12 ? '오전' : '오후', hh = h % 12 === 0 ? 12 : h % 12;
-  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>별손님 ${visitorOf(G.stay.day).name} · ${seasonOf(G.stay.day)} · 한 해 D-${Math.max(0, G.stay.len - G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
+  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>별손님 ${visitorOf(G.stay.day, G.stay.year).name} · ${seasonOf(G.stay.day)} · 한 해 D-${Math.max(0, G.stay.len - G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
   $('[data-open="dex"]').classList.toggle('hide', !G.stay && !Object.keys(G.dex || {}).length);
   const goal = GOALS[G.step] || '';
   $('#goal').classList.toggle('hide', !goal || !!svc);
@@ -582,9 +621,13 @@ function openBook() {
     if (a === 'dex') { p.close(); openDex(); }
     if (a === 'new') { p.close(); openCreator().then(openBook); }
     if (a === 'del' && (svc || looseItems().includes(v))) return no('지금 쓰고 있는 요리예요. 영업이 끝나고 주방을 비운 뒤에 지워요.');
-    if (a === 'del' && confirm('이 요리를 수첩에서 지울까요?')) {
-      G.custom = G.custom.filter(c => c.id !== v); G.recipes = G.recipes.filter(r => r !== v);
-      delete G.inv[v]; delete RECIPES[v]; p.close(); openBook();
+    if (a === 'del') {
+      p.close();
+      runScene(async () => {
+        if (await UI.choose([`「${RECIPES[v].name}」 지우기`, '그만두기']) !== 0) return;
+        G.custom = G.custom.filter(c => c.id !== v); G.recipes = G.recipes.filter(r => r !== v);
+        delete G.inv[v]; delete RECIPES[v];
+      }).then(openBook);
     }
   });
 }
@@ -811,6 +854,8 @@ function openSettings() {
     <div class="row"><span class="grow">효과음</span><button class="btn" data-a="sfx">${Au.opt.sfx ? '켜짐' : '꺼짐'}</button></div>
     <div class="row"><span class="grow">배경 음악</span><button class="btn" data-a="music">${Au.opt.music ? '켜짐' : '꺼짐'}</button></div>
     <div class="row"><span class="grow">지금 저장</span><button class="btn" data-a="save">저장</button></div>
+    <div class="row"><span class="grow">어제 아침으로 되돌리기<br><small>하루가 바뀔 때마다 자동으로 남겨 둬요</small></span><button class="btn" data-a="restore">되돌리기</button></div>
+    <div class="row"><span class="grow">백업 코드<br><small>다른 기기로 옮기거나 지워질 때를 대비해요</small></span><button class="btn" data-a="backup">열기</button></div>
     <div class="row"><span class="grow">처음부터 다시</span><button class="btn" data-a="reset">지우기</button></div>
     ${window.__TOSS__ ? '' : `<div class="row"><span class="grow">예전 여행 수첩 앱</span><a class="btn" href="heuksim/" style="text-decoration:none">열기</a></div>`}
     <div class="sec">조작</div>
@@ -821,8 +866,52 @@ function openSettings() {
     if (a === 'sfx') Au.setSfx(!Au.opt.sfx);
     if (a === 'music') Au.setMusic(!Au.opt.music);
     if (a === 'save') { save(); toast('저장했어요.'); }
-    if (a === 'reset') { if (confirm('저장된 진행을 모두 지우고 처음으로 돌아갈까요?')) { try { localStorage.removeItem(SAVE); } catch (e) { /* 무시 */ } location.reload(); } return; }
+    if (a === 'reset') {
+      p.close();
+      return runScene(async () => {
+        if (await UI.choose(['모두 지우고 처음으로', '그만두기']) !== 0) return;
+        try { localStorage.removeItem(SAVE); localStorage.removeItem(BACKUP); } catch (e) { /* 무시 */ }
+        mode = 'title'; location.reload();
+      });
+    }
+    if (a === 'restore') {
+      p.close();
+      return runScene(async () => {
+        let b = null; try { b = parseSave(localStorage.getItem(BACKUP)); } catch (e) { b = null; }
+        if (!b) return UI.narr('아직 남겨 둔 백업이 없어요.\n하루를 마치면 생겨요.');
+        if (await UI.choose([`${b.day}일째 아침으로 되돌리기`, '그만두기']) !== 0) return;
+        localStorage.setItem(SAVE, JSON.stringify(b)); mode = 'title'; location.reload();
+      });
+    }
+    if (a === 'backup') { p.close(); return openBackup(); }
     p.set(html());
+  });
+}
+function openBackup() {
+  save();
+  let code = '';
+  try { code = encodeSave(localStorage.getItem(SAVE) || ''); } catch (e) { code = ''; }
+  const html = () => `<div class="sec">내 백업 코드</div>
+    <p><small>이 코드를 메모장이나 메신저 '나에게 보내기'에 붙여 두면, 언제든 이 진행으로 돌아올 수 있어요.</small></p>
+    <textarea id="bk-out" readonly rows="4" style="width:100%;font:inherit;font-size:.7rem;word-break:break-all">${code}</textarea>
+    <p class="center"><button class="btn main" data-a="copy">코드 복사</button></p>
+    <div class="sec">백업 코드로 불러오기</div>
+    <textarea id="bk-in" rows="4" placeholder="여기에 백업 코드를 붙여 넣어요" style="width:100%;font:inherit;font-size:.7rem;user-select:text;-webkit-user-select:text"></textarea>
+    <p class="center"><button class="btn" data-a="load">불러오기</button></p>`;
+  return openPanel('백업 코드', html(), (a, v, p) => {
+    if (a === 'copy') {
+      const t = $('#bk-out');
+      (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).then(() => toast('복사했어요.')).catch(() => { t.select(); toast('코드를 길게 눌러 복사해 주세요.'); });
+    }
+    if (a === 'load') {
+      const d = parseSave(decodeSave($('#bk-in').value));
+      if (!d) return no('올바른 백업 코드가 아니에요. 처음부터 끝까지 빠짐없이 붙여 넣었는지 확인해 주세요.');
+      p.close();
+      runScene(async () => {
+        if (await UI.choose([`${d.name}의 ${d.day}일째로 불러오기 (지금 진행은 사라져요)`, '그만두기']) !== 0) return;
+        localStorage.setItem(SAVE, JSON.stringify(d)); mode = 'title'; location.reload();
+      });
+    }
   });
 }
 function shopList() {
@@ -977,7 +1066,7 @@ function usePantry() {
 function useBoard() {
   if (!P.hands) return toast('도마: 손질할 재료를 들고 와요.');
   if (!(ITEMS[P.hands] && ITEMS[P.hands].chop)) return no(`${itemName(P.hands)}: 손질할 필요가 없어요.`);
-  P.act = { t: 0, dur: 0.9 * (owns('knife') ? 0.5 : 1) * (G.trait === 'quick' ? 0.4 : 1), tick: 0, done() { P.hands += '_c'; Au.sfx('put'); } };
+  P.act = { t: 0, dur: 0.9 / TEST_SPEED * (owns('knife') ? 0.5 : 1) * (G.trait === 'quick' ? 0.4 : 1), tick: 0, done() { P.hands += '_c'; Au.sfx('put'); } };
 }
 function useCounter(c) {
   const h = P.hands; P.hands = c.item; c.item = h;
@@ -1025,7 +1114,7 @@ function updateCookers(dt) {
   for (const c of MAPS.shop.things) {
     if (c.type !== 'cooker' || c.cook === null) continue;
     const fast = (G.trait === 'fire' && c.kind === 'pan') || (G.trait === 'soup' && c.kind !== 'pan') ? 0.75 : 1;
-    c.cook += dt / ((c.kind === 'cauldron' ? 7 : 5) * (owns('stove') ? 0.7 : 1) * fast);
+    c.cook += dt * TEST_SPEED / ((c.kind === 'cauldron' ? 7 : 5) * (owns('stove') ? 0.7 : 1) * fast);
     if (Math.random() < dt * 9) particles.push({ x: c.x * T + c.w * 8 - 4 + Math.random() * 8, y: T + 4, vx: (Math.random() - 0.5) * 4, vy: -9 - Math.random() * 6, life: 1.3, max: 1.3 });
     if (c.cook >= 1) { c.cook = null; c.result = c.making; c.contents = []; Au.sfx('done'); floater(c.x * T + c.w * 8, T - 4, `${RECIPES[c.result].name} 완성!`); }
   }
@@ -1191,6 +1280,7 @@ async function sleep() {
   if (await UI.choose(['잠자리에 든다 (다음 날로)', '아직 할 일이 남았다']) !== 0) return;
   await UI.black(true); Au.sfx('sleep');
   collectLoose();
+  try { const cur = localStorage.getItem(SAVE); if (cur) localStorage.setItem(BACKUP, cur); } catch (e) { /* 백업 실패는 넘어가요 */ }
   G.day++; G.time = 8 * 60; G.taken = {}; G.servedToday = false; G.flags.credit = false; G.traveled = false; sunsetTold = false;
   // 밤사이 일어나는 일: 이자, 가공 완성, 농장 배달, 새 의뢰, 오늘의 일
   const B = G.bank, int = B.loan ? Math.ceil(B.loan * 0.03) : 0, gain = Math.min(20, Math.floor(B.dep * 0.01));
@@ -1230,7 +1320,7 @@ function showVisitor(v) { CHARS.visitor = CHARS[v.id]; NPC_NAME.visitor = v.name
 const pp = (w, pair) => josa(w, pair).slice(w.length); // 조사만
 const waitLine = name => `오늘은 「${name}」${pp(name, '이/가')} 궁금해요. 만들어서 가져와 줄래요? 같이 먹으면서 배우고 싶어요.`;
 function pickLesson() {
-  const v = visitorOf(G.stay.day);
+  const v = visitorOf(G.stay.day, G.stay.year);
   const known = G.recipes.filter(r => REAL[r]);
   const fresh = known.filter(r => !(G.dex[r] || []).includes(v.id)); // 이 손님이 아직 맛보지 않은 것
   const pool = fresh.length ? fresh : known;
@@ -1241,8 +1331,13 @@ function pickLesson() {
 }
 async function arrive(v) {
   showVisitor(v);
-  await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
-  for (const line of v.hello) await UI.say('visitor', line);
+  G.met = G.met || [];
+  if (G.met.includes(v.id)) { await UI.narr(`저녁 막차에서 낯익은 더듬이가 보였다.`); await UI.say('visitor', `또 왔어요! ${v.name}예요. 이번에도 가르쳐 줄 거죠?`); }
+  else {
+    G.met.push(v.id);
+    await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
+    for (const line of v.hello) await UI.say('visitor', line);
+  }
   G.world = G.world || {};
   const w = WORLD[v.world];
   if (w && !G.world[v.world]) {
@@ -1269,7 +1364,7 @@ async function homestayMorning() {
   if (!G.stay) return;
   G.stay.day++;
   if (G.stay.day > G.stay.len) return yearEnd();
-  const prev = visitorOf(G.stay.day - 1), v = visitorOf(G.stay.day);
+  const prev = visitorOf(G.stay.day - 1, G.stay.year), v = visitorOf(G.stay.day, G.stay.year);
   if (prev.id !== v.id) {
     showVisitor(prev);
     await UI.narr(`솥골에 ${seasonOf(G.stay.day)}이 왔다.\n${prev.name}가 짐을 쌌다.`);
@@ -1282,7 +1377,7 @@ async function homestayMorning() {
 async function talkVisitor() {
   const st = G.stay;
   if (!st) return;
-  const v = visitorOf(st.day); showVisitor(v);
+  const v = visitorOf(st.day, st.year); showVisitor(v);
   if (st.taught) return UI.say('visitor', '오늘 배운 건 도감에 적어 뒀어요. 내일도 알려 줄 거죠?');
   const id = st.today, name = RECIPES[id].name;
   if (inv(id) <= 0) {
@@ -1312,7 +1407,7 @@ async function talkVisitor() {
   checkChallenges();
 }
 async function yearEnd() {
-  const st = G.stay, last = VISITORS[3];
+  const st = G.stay, last = visitorOf(st.len, st.year);
   showVisitor(last);
   await UI.narr('이 마을의 한 해가 다 갔다.');
   await UI.say('visitor', last.bye);
@@ -1321,9 +1416,8 @@ async function yearEnd() {
   const c = await UI.choose(['한 해 더 (별손님들이 다시 와요)', '여기서 계속 지낸다 (손님맞이는 쉬어요)', '새로 시작한다 (도감은 이어져요)']);
   if (c === 0) {
     st.year++; st.day = 1;
-    showVisitor(visitorOf(1));
-    await UI.narr('봄이 오자, 막차에서 낯익은 얼굴이 내렸다.');
-    await UI.say('visitor', '또 왔어요! 이번엔 별 셋짜리 요리를 배우고 싶어요.');
+    await UI.narr('다시 봄이 왔다.');
+    await arrive(visitorOf(1, st.year));
     pickLesson();
     await UI.say('visitor', waitLine(RECIPES[st.today].name));
     return;
@@ -1334,7 +1428,7 @@ async function yearEnd() {
   G.stay = null; G.up.stay = 0; G.flags.stayDone = true; G.step = 'after_stay';
   if (c === 2) {
     await UI.narr(`레시피 도감을 챙겼다.\n새로운 이야기가 시작된다.`);
-    try { localStorage.removeItem(SAVE); } catch (e) { /* 무시 */ }
+    try { localStorage.removeItem(SAVE); localStorage.removeItem(BACKUP); } catch (e) { /* 무시 */ }
     mode = 'title'; location.reload();
   }
 }
@@ -1712,22 +1806,12 @@ function render() {
 
 /* ═════════ 시작 ═════════ */
 function startGame(state, isNew) {
-  G = state; if (!G.stats) G.stats = { served: 0, earned: 0 };
-  // 예전 저장에도 경영 요소를 채워 넣어요
-  G.up = G.up || {}; G.rep = G.rep || 0; G.custom = G.custom || []; G.done = G.done || {}; if (G.trait === undefined) G.trait = null;
-  G.bank = G.bank || { dep: 0, loan: 0 }; G.craft = G.craft || []; G.wear = G.wear || []; G.event = G.event || null; G.traveled = !!G.traveled;
-  G.look = G.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
-  G.dex = G.dex || {};
-  G.world = G.world || {};
-  if (G.book) { for (const id of G.book) G.dex[id] = G.dex[id] || ['eunha']; delete G.book; } // 예전 '진짜 레시피북'을 도감으로
-  G.body = G.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
+  G = fillDefaults(state);
   for (const k of Object.keys(RECIPES)) if (RECIPES[k].custom) delete RECIPES[k];
   G.custom.forEach(registerCustom);
-  if (!G.rep && G.stats.served) G.rep = G.stats.served;
-  if (!G.reqs) G.reqs = [];
   ensureReqs();
   applyLook(); walkers.length = 0;
-  if (G.stay) showVisitor(visitorOf(G.stay.day));
+  if (G.stay) showVisitor(visitorOf(G.stay.day, G.stay.year));
   mode = 'play'; svc = null;
   map = MAPS[G.map] || MAPS.village;
   P.x = G.x; P.y = G.y; P.px = P.x * T; P.py = P.y * T; P.dir = 'down'; P.hands = null; P.moving = false; P.path = null;
@@ -1736,7 +1820,7 @@ function startGame(state, isNew) {
   $('#title').classList.add('hide'); $('#hud').classList.remove('hide');
   Au.unlock(); Au.setMood(G.time >= 19 * 60 ? 'night' : 'day');
   refreshHUD();
-  if (isNew) { G.seenAt = Date.now(); G.lastDate = todayKey(); G.realDays = 1; }
+  if (isNew) { try { localStorage.removeItem(BACKUP); } catch (e) { /* 무시 */ } G.seenAt = Date.now(); G.lastDate = todayKey(); G.realDays = 1; }
   if (isNew || G.step === 'intro') runScene(story.scenes.intro);
   else if (!G.trait && G.recipes.length && G.step !== 'first_cook' && G.step !== 'gather') runScene(pickTrait);
   else { welcomeBack(); if (!busy) toast(greeting(), 'heart', 4200); }
@@ -1757,7 +1841,12 @@ function boot() {
   if (sv) $('#btn-continue').classList.remove('hide');
   $('#btn-continue').addEventListener('click', () => startGame(load(), false));
   $('#btn-new').addEventListener('click', () => {
-    if (load() && !confirm('저장된 진행이 있어요. 지우고 새로 시작할까요?')) return;
+    const b = $('#btn-new');
+    if (load() && !b.dataset.armed) {
+      b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 저장을 지우고 새로 시작';
+      setTimeout(() => { delete b.dataset.armed; b.textContent = '새로 시작'; }, 4000);
+      return;
+    }
     const name = ($('#name').value || '').trim().slice(0, 6) || '하루';
     const st = newState(name); st.dex = JSON.parse(JSON.stringify(loadLegacy().dex)); startGame(st, true);
   });
