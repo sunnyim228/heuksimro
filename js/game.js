@@ -3,6 +3,7 @@ import { T, buildSprites, renderGround, makeChar, makeAlien, portrait, itemIcon,
 import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemName, baseOf, LOOKS, NPC_NAME, GUEST_LOOKS, GUEST_LINES, NPC_GUEST_LINES, VALUE, TRAITS, RANKS, rankOf, UPGRADES, CHALLENGES, TRAVEL_ORDER, CRAFTS, PLACES, HAIR_COLORS, HAIR_STYLES, WEAR, EVENTS, REQ_PEOPLE, REQ_ITEMS, WALKER_LINES, SHARE_LINES, NPC_DONE, TAG_NAME, tagsFor, MOODS, MOOD_MISS, BOND_STORIES } from './data.js';
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
+import { EPISODES } from './episodes/index.js'; // 연재 화들을 먼저 등록해요
 import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER, WORLD, HINTS, DEX_GROUPS } from './homestay.js';
 
 const $ = s => document.querySelector(s);
@@ -419,7 +420,7 @@ function refreshHUD() {
   ensureReqs();
   const h = Math.floor(G.time / 60), mi = Math.floor(G.time % 60 / 10) * 10;
   const ap = h < 12 ? '오전' : '오후', hh = h % 12 === 0 ? 12 : h % 12;
-  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>별손님 ${visitorOf(G.stay.day).name} · ${seasonOf(G.stay.day)} · 한 해 D-${Math.max(0, G.stay.len - G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
+  $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>별손님 ${visitorOf(G.stay.day, G.stay.year).name} · ${seasonOf(G.stay.day)} · 한 해 D-${Math.max(0, G.stay.len - G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
   $('[data-open="dex"]').classList.toggle('hide', !G.stay && !Object.keys(G.dex || {}).length);
   const goal = GOALS[G.step] || '';
   $('#goal').classList.toggle('hide', !goal || !!svc);
@@ -1230,7 +1231,7 @@ function showVisitor(v) { CHARS.visitor = CHARS[v.id]; NPC_NAME.visitor = v.name
 const pp = (w, pair) => josa(w, pair).slice(w.length); // 조사만
 const waitLine = name => `오늘은 「${name}」${pp(name, '이/가')} 궁금해요. 만들어서 가져와 줄래요? 같이 먹으면서 배우고 싶어요.`;
 function pickLesson() {
-  const v = visitorOf(G.stay.day);
+  const v = visitorOf(G.stay.day, G.stay.year);
   const known = G.recipes.filter(r => REAL[r]);
   const fresh = known.filter(r => !(G.dex[r] || []).includes(v.id)); // 이 손님이 아직 맛보지 않은 것
   const pool = fresh.length ? fresh : known;
@@ -1241,8 +1242,13 @@ function pickLesson() {
 }
 async function arrive(v) {
   showVisitor(v);
-  await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
-  for (const line of v.hello) await UI.say('visitor', line);
+  G.met = G.met || [];
+  if (G.met.includes(v.id)) { await UI.narr(`저녁 막차에서 낯익은 더듬이가 보였다.`); await UI.say('visitor', `또 왔어요! ${v.name}예요. 이번에도 가르쳐 줄 거죠?`); }
+  else {
+    G.met.push(v.id);
+    await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
+    for (const line of v.hello) await UI.say('visitor', line);
+  }
   G.world = G.world || {};
   const w = WORLD[v.world];
   if (w && !G.world[v.world]) {
@@ -1269,7 +1275,7 @@ async function homestayMorning() {
   if (!G.stay) return;
   G.stay.day++;
   if (G.stay.day > G.stay.len) return yearEnd();
-  const prev = visitorOf(G.stay.day - 1), v = visitorOf(G.stay.day);
+  const prev = visitorOf(G.stay.day - 1, G.stay.year), v = visitorOf(G.stay.day, G.stay.year);
   if (prev.id !== v.id) {
     showVisitor(prev);
     await UI.narr(`솥골에 ${seasonOf(G.stay.day)}이 왔다.\n${prev.name}가 짐을 쌌다.`);
@@ -1282,7 +1288,7 @@ async function homestayMorning() {
 async function talkVisitor() {
   const st = G.stay;
   if (!st) return;
-  const v = visitorOf(st.day); showVisitor(v);
+  const v = visitorOf(st.day, st.year); showVisitor(v);
   if (st.taught) return UI.say('visitor', '오늘 배운 건 도감에 적어 뒀어요. 내일도 알려 줄 거죠?');
   const id = st.today, name = RECIPES[id].name;
   if (inv(id) <= 0) {
@@ -1312,7 +1318,7 @@ async function talkVisitor() {
   checkChallenges();
 }
 async function yearEnd() {
-  const st = G.stay, last = VISITORS[3];
+  const st = G.stay, last = visitorOf(st.len, st.year);
   showVisitor(last);
   await UI.narr('이 마을의 한 해가 다 갔다.');
   await UI.say('visitor', last.bye);
@@ -1321,9 +1327,8 @@ async function yearEnd() {
   const c = await UI.choose(['한 해 더 (별손님들이 다시 와요)', '여기서 계속 지낸다 (손님맞이는 쉬어요)', '새로 시작한다 (도감은 이어져요)']);
   if (c === 0) {
     st.year++; st.day = 1;
-    showVisitor(visitorOf(1));
-    await UI.narr('봄이 오자, 막차에서 낯익은 얼굴이 내렸다.');
-    await UI.say('visitor', '또 왔어요! 이번엔 별 셋짜리 요리를 배우고 싶어요.');
+    await UI.narr('다시 봄이 왔다.');
+    await arrive(visitorOf(1, st.year));
     pickLesson();
     await UI.say('visitor', waitLine(RECIPES[st.today].name));
     return;
@@ -1727,7 +1732,7 @@ function startGame(state, isNew) {
   if (!G.reqs) G.reqs = [];
   ensureReqs();
   applyLook(); walkers.length = 0;
-  if (G.stay) showVisitor(visitorOf(G.stay.day));
+  if (G.stay) showVisitor(visitorOf(G.stay.day, G.stay.year));
   mode = 'play'; svc = null;
   map = MAPS[G.map] || MAPS.village;
   P.x = G.x; P.y = G.y; P.px = P.x * T; P.py = P.y * T; P.dir = 'down'; P.hands = null; P.moving = false; P.path = null;
