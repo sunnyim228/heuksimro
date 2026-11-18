@@ -473,8 +473,8 @@ const UI = {
       const layer = $('#dlg-layer'); layer.classList.remove('hide', 'center');
       $('#dlg-name').classList.add('hide'); $('#dlg-face').classList.add('hide'); $('#dlg-next').classList.add('hide');
       $('#dlg-text').textContent = '어떻게 할까?';
-      dlg = { choice: true, done: true, full: '', options, pick: i => { dlg = null; layer.classList.add('hide'); $('#choices').innerHTML = ''; Au.sfx('blip'); resolve(i); } };
-      $('#choices').innerHTML = options.map((o, i) => `<button class="btn" data-i="${i}">${esc(o)}</button>`).join('');
+      dlg = { choice: true, done: true, full: '', options, sel: 0, pick: i => { dlg = null; layer.classList.add('hide'); $('#choices').innerHTML = ''; Au.sfx('blip'); resolve(i); } };
+      $('#choices').innerHTML = options.map((o, i) => `<button class="btn${i ? '' : ' sel'}" data-i="${i}">${esc(o)}</button>`).join('');
     });
   },
 };
@@ -785,7 +785,7 @@ function openSettings() {
     <div class="row"><span class="grow">처음부터 다시</span><button class="btn" data-a="reset">지우기</button></div>
     ${window.__TOSS__ ? '' : `<div class="row"><span class="grow">예전 여행 수첩 앱</span><a class="btn" href="heuksim/" style="text-decoration:none">열기</a></div>`}
     <div class="sec">조작</div>
-    <p>· 화면을 누르면 그곳으로 걸어가요.<br>· 사람·물건·조리대를 누르면 다가가서 말을 걸거나 써요.<br>· 키보드: 방향키/WASD 이동, 스페이스 살펴보기.</p>
+    <p>· 화면을 누르면 그곳으로 걸어가요.<br>· 사람·물건·조리대를 누르면 다가가서 말을 걸거나 써요.<br>· 키보드: 방향키/WASD 이동, 스페이스 살펴보기, Esc 닫기.<br>· 게임 패드: 십자 버튼·스틱 이동, A 살펴보기, B 닫기, X 가방, Y 수첩, START 장부, SELECT 설정. 메뉴 안에서는 십자 버튼으로 고르고 A로 눌러요.</p>
     <div class="sec">요리 순서</div>
     <p>선반에서 재료 꺼내기 → (채소·두부·버섯은) 도마에서 손질 → 레시피에 맞는 팬/냄비에 넣기 → 다 되면 꺼내서 손님 식탁으로.<br>한 번에 하나만 들 수 있고, 빈 조리대에 잠깐 올려 둘 수 있어요.</p>`;
   return openPanel('설정', html(), (a, v, p) => {
@@ -1196,31 +1196,93 @@ function tapWorld(cx, cy) {
   if (path) { P.path = path; P.onArrive = null; tapMark = { x: tx * T + 8, y: ty * T + 8, t: 0.4 }; }
 }
 cvs.addEventListener('pointerdown', e => { e.preventDefault(); tapWorld(e.clientX, e.clientY); });
+/* ── 버튼 하나하나가 하는 일 (키보드와 게임 패드가 같이 써요) ── */
+function moveChoice(d) {
+  if (!dlg || !dlg.choice) return false;
+  const n = dlg.options.length; dlg.sel = (dlg.sel + d + n) % n;
+  [...$('#choices').children].forEach((b, i) => b.classList.toggle('sel', i === dlg.sel));
+  Au.sfx('blip'); return true;
+}
+function movePanelFocus(d) {
+  if (!panelClose) return false;
+  const els = [...document.querySelectorAll('#panel-body button:not([disabled]), #panel-body a, #panel-body input, #panel-x')].filter(el => el.offsetParent);
+  if (!els.length) return true;
+  let i = els.indexOf(document.activeElement);
+  i = i < 0 ? (d > 0 ? 0 : els.length - 1) : (i + d + els.length) % els.length;
+  els[i].focus(); els[i].scrollIntoView({ block: 'nearest' }); Au.sfx('blip'); return true;
+}
+function navDir(dir) { // 방향 버튼을 '누른 순간' (걷기는 keyDir가 따로 봐요)
+  const d = dir === 'up' || dir === 'left' ? -1 : 1;
+  if (moveChoice(d)) return true;
+  if (movePanelFocus(d)) return true;
+  return false;
+}
+function actionA() {
+  Au.unlock();
+  if (mode === 'title') { const c = $('#btn-continue'); (c.classList.contains('hide') ? $('#btn-new') : c).click(); return; }
+  if (panelClose) { const el = document.activeElement; if (el && $('#panel').contains(el) && el.tagName !== 'INPUT') el.click(); else movePanelFocus(1); return; }
+  if (letterClose) return letterClose();
+  if (dlg && dlg.choice) return dlg.pick(dlg.sel);
+  if (dlg) return advanceDialog();
+  if (mode !== 'play' || busy) return;
+  if (P.fish) return reel();
+  if (P.moving || P.act) return;
+  const [dx, dy] = DIRS[P.dir];
+  let th = actAt(P.x + dx, P.y + dy);
+  if (!th && svc) { const g = svc.cust.find(c => c.x === P.x + dx && c.y === P.y + dy); if (g) th = g.table; }
+  if (th) interact(th);
+}
+function actionB() { // 닫기·물러나기
+  if (panelClose) return panelClose();
+  if (letterClose) return letterClose();
+  if (dlg && dlg.choice) return dlg.pick(dlg.options.length - 1);
+  if (dlg) return advanceDialog();
+}
+function menuKey(name) {
+  if (mode !== 'play' || busy || dlg) return;
+  Au.sfx('blip');
+  ({ bag: openBag, book: openBook, ledger: openLedger, set: openSettings })[name]();
+}
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
+  if (e.target.tagName === 'INPUT') { if (k === 'enter' && mode === 'title') actionA(); return; }
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
   if (e.repeat) return;
   keys[k] = true; Au.unlock();
-  const ok = k === ' ' || k === 'enter' || k === 'e';
-  if (k === 'escape' && panelClose) return panelClose();
-  if (ok && letterClose) return letterClose();
-  if (ok && dlg) return advanceDialog();
+  const arrows = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
+  if (arrows[k] && navDir(arrows[k])) return;
+  if (k === ' ' || k === 'enter' || k === 'e') return actionA();
+  if (k === 'escape' || k === 'backspace') return actionB();
   if (dlg && dlg.choice && /^[1-9]$/.test(k) && +k <= dlg.options.length) return dlg.pick(+k - 1);
-  if (mode !== 'play' || busy) return;
-  if (ok) {
-    if (P.fish) return reel();
-    if (P.moving || P.act) return;
-    const [dx, dy] = DIRS[P.dir];
-    let th = actAt(P.x + dx, P.y + dy);
-    if (!th && svc) { const g = svc.cust.find(c => c.x === P.x + dx && c.y === P.y + dy); if (g) th = g.table; }
-    if (th) interact(th);
-  }
-  if (k === 'i') openBag(); if (k === 'r') openBook();
+  if (k === 'i') menuKey('bag'); if (k === 'r') menuKey('book');
 });
+
+/* ── 게임 패드 (블루투스·USB 조이스틱, 휴대 게임기 버튼) ── */
+// 표준 배치: 0 A(아래) 1 B(오른쪽) 2 X(왼쪽) 3 Y(위) 8 SELECT 9 START 12~15 십자 버튼, 왼쪽 스틱
+const pad = { dir: null, prev: [], prevDir: null, seen: false };
+function pollPad() {
+  const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(g => g && g.connected);
+  if (!gp) { pad.dir = null; return; }
+  if (!pad.seen) { pad.seen = true; toast('게임 패드 연결됨\nA 살펴보기 · B 닫기 · X 가방 · Y 수첩 · START 장부 · SELECT 설정', null, 6000); }
+  const on = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+  pad.dir = on(12) || ay < -0.5 ? 'up' : on(13) || ay > 0.5 ? 'down' : on(14) || ax < -0.5 ? 'left' : on(15) || ax > 0.5 ? 'right' : null;
+  if (pad.dir && pad.dir !== pad.prevDir) navDir(pad.dir);
+  pad.prevDir = pad.dir;
+  const edge = i => on(i) && !pad.prev[i];
+  if (edge(0)) actionA();
+  if (edge(1)) actionB();
+  if (edge(2)) menuKey('bag');
+  if (edge(3)) menuKey('book');
+  if (edge(9)) menuKey('ledger');
+  if (edge(8)) menuKey('set');
+  pad.prev = gp.buttons.map(b => b.pressed);
+}
+addEventListener('gamepadconnected', () => { pad.seen = false; });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function keyDir() {
+  if (pad.dir && !panelClose && !(dlg && dlg.choice)) return pad.dir;
   if (keys.arrowup || keys.w) return 'up'; if (keys.arrowdown || keys.s) return 'down';
   if (keys.arrowleft || keys.a) return 'left'; if (keys.arrowright || keys.d) return 'right';
   return null;
@@ -1280,6 +1342,7 @@ function updateParticles(dt) {
 let hudT = 0, saveT = 0, sunsetTold = false;
 function update(dt) {
   tAnim += dt;
+  pollPad();
   updateDialog(dt); updateParticles(dt);
   if (tapMark) { tapMark.t -= dt; if (tapMark.t <= 0) tapMark = null; }
   if (mode === 'title') { const m = MAPS.village; camX = clamp(28 * T - VW / 2 + Math.sin(tAnim * 0.15) * 60, 0, m.w * T - VW); camY = clamp(15 * T - VH / 2 + Math.cos(tAnim * 0.11) * 30, 0, m.h * T - VH); }
@@ -1479,6 +1542,7 @@ function boot() {
     const name = ($('#name').value || '').trim().slice(0, 6) || '하루';
     startGame(newState(name), true);
   });
+  if ('serviceWorker' in navigator && !window.__TOSS__) navigator.serviceWorker.register('sw.js').catch(() => {});
   addEventListener('visibilitychange', () => { if (document.hidden) save(); else welcomeBack(); });
   $('#greet').textContent = greeting();
   addEventListener('pagehide', save);

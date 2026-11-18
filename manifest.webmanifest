@@ -1,0 +1,17 @@
+{
+  "name": "모락모락 — 솥골 식당 이야기",
+  "short_name": "모락모락",
+  "description": "할머니의 식당을 다시 여는 힐링 요리 게임",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#2b1d18",
+  "theme_color": "#2b1d18",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -12,6 +12,7 @@ cpSync('fonts', `${out}/fonts`, { recursive: true });
 let html = readFileSync('index.html', 'utf8');
 const mark = '<script type="module" src="js/game.js"></script>';
 if (!html.includes(mark)) throw new Error('index.html에서 게임 스크립트 태그를 찾지 못했어요.');
-html = html.replace(mark, `<script>window.__TOSS__ = true;</script>\n${mark}`);
+html = html.replace(mark, `<script>window.__TOSS__ = true;</script>\n${mark}`)
+  .replace(/<link rel="(manifest|apple-touch-icon)"[^>]*>\n?/g, '');
 writeFileSync(`${out}/index.html`, html);
 console.log('dist/ 준비 완료');
