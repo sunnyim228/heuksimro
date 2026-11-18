@@ -22,6 +22,13 @@ export const ITEMS = {
   dried_mushroom: { name: '말린 표고' },
   mu_dried: { name: '무말랭이' },
   dried_fish: { name: '반건조 생선' },
+  // 별손님이 들렀던 나라의 재료 (그 손님이 오면 만물상에 들어와요)
+  pasta: { name: '파스타면', price: 3 },
+  tomato: { name: '토마토', price: 2 },
+  cheese: { name: '치즈', price: 4 },
+  ricenoodle: { name: '쌀국수면', price: 3 },
+  curry: { name: '카레 가루', price: 3 },
+  tortilla: { name: '또띠아', price: 3 },
 };
 export const SHOP_LIST = ['rice', 'egg', 'tofu', 'doenjang'];
 
@@ -41,6 +48,16 @@ Object.assign(RECIPES, {
   baechujeon: { name: '배추전', cooker: 'pan', ing: ['cabbage_c', 'egg'], price: 14, from: '윗마을 농장 아주머니', memo: '줄기는 칼등으로 두드려 편다.' },
   spicy_fish: { name: '매운 생선조림', cooker: 'pot', ing: ['fish', 'mu_c', 'chili'], price: 24, from: '읍내 장터 반찬가게', memo: '무가 생선보다 맛있어야 한다.' },
   abalone_juk: { name: '전복죽', cooker: 'pot', ing: ['rice', 'abalone', 'sesame'], price: 32, from: '건넛섬 해녀의 집', memo: '쌀알이 퍼질 때까지 젓는 걸 멈추지 않는다.' },
+});
+Object.assign(RECIPES, {
+  tomato_pasta: { name: '토마토 파스타', cooker: 'pot', ing: ['pasta', 'tomato', 'cheese'], price: 20, from: '은하의 지구 여행 수첩 · 이탈리아', memo: '면 삶은 물 한 컵은 버리지 않는다.', world: 'italy' },
+  risotto: { name: '버섯 리소토', cooker: 'pan', ing: ['rice', 'mushroom_c', 'cheese'], price: 22, from: '은하의 지구 여행 수첩 · 이탈리아', memo: '쌀은 씻지 않고, 계속 젓는다.', world: 'italy' },
+  pad_thai: { name: '팟타이', cooker: 'pan', ing: ['ricenoodle', 'egg', 'pa_c'], price: 22, from: '보리의 지구 여행 수첩 · 태국', memo: '센 불, 빠른 손.', world: 'thai' },
+  tom_yum: { name: '조개 똠얌', cooker: 'pot', ing: ['clam', 'tomato', 'mushroom_c'], price: 26, from: '보리의 지구 여행 수첩 · 태국', memo: '신맛은 불을 끈 뒤에.', world: 'thai' },
+  potato_curry: { name: '감자 커리', cooker: 'pot', ing: ['curry', 'gamja_c', 'rice'], price: 22, from: '모모의 지구 여행 수첩 · 인도', memo: '양파가 갈색이 될 때까지 기다린다.', world: 'india' },
+  fish_curry: { name: '생선 커리', cooker: 'pot', ing: ['curry', 'fish', 'tomato'], price: 26, from: '모모의 지구 여행 수첩 · 인도', memo: '생선을 넣으면 젓지 말고 흔든다.', world: 'india' },
+  quesadilla: { name: '치즈 케사디야', cooker: 'pan', ing: ['tortilla', 'cheese'], price: 18, from: '이로의 지구 여행 수첩 · 멕시코', memo: '약불에서 천천히, 치즈가 녹을 때까지.', world: 'mexico' },
+  taco: { name: '생선 타코', cooker: 'pan', ing: ['tortilla', 'fish', 'cabbage_c'], price: 24, from: '이로의 지구 여행 수첩 · 멕시코', memo: '둘러서서, 손으로.', world: 'mexico' },
 });
 export const TRAVEL_ORDER = ['baechujeon', 'spicy_fish', 'abalone_juk'];
 export const RECIPE_ORDER = ['egg_rice', 'doenjang_jjigae', 'radish_soup', 'miyeok_guk', 'gamjajeon', 'mushroom_rice', 'namul_rice', 'grilled_fish', 'gukbap'];
@@ -92,7 +109,7 @@ export const NPC_GUEST_LINES = {
 };
 
 /* ───────── 경영·성장 ───────── */
-export const VALUE = { rice: 2, egg: 2, tofu: 3, doenjang: 4, pa: 2, mu: 2, gamja: 2, mushroom: 3, namul: 3, clam: 3, miyeok: 3, fish: 6, cabbage: 3, chili: 3, sesame: 5, abalone: 9, dried_mushroom: 8, mu_dried: 6, dried_fish: 13 };
+export const VALUE = { rice: 2, egg: 2, tofu: 3, doenjang: 4, pa: 2, mu: 2, gamja: 2, mushroom: 3, namul: 3, clam: 3, miyeok: 3, fish: 6, cabbage: 3, chili: 3, sesame: 5, abalone: 9, dried_mushroom: 8, mu_dried: 6, dried_fish: 13, pasta: 3, tomato: 2, cheese: 4, ricenoodle: 3, curry: 3, tortilla: 3 };
 
 // 나의 손맛: 주인공의 특성
 export const TRAITS = {
@@ -133,7 +150,8 @@ export const CHALLENGES = [
   { id: 'debtfree', name: '빚 없는 아침', desc: '대출을 받았다가 모두 갚기', reward: 50, test: G => !!G.flags.borrowed && G.bank.loan === 0 },
   { id: 'reader', name: '얼굴만 봐도 안다', desc: '사정 있는 손님에게 딱 맞는 음식을 10번', reward: 60, test: G => (G.stats.fit || 0) >= 10 },
   { id: 'week', name: '일주일 동안 문 열기', desc: '서로 다른 7일에 모락식당 열기', reward: 50, test: G => (G.realDays || 0) >= 7 },
-  { id: 'dex', name: '레시피 도감 완성', desc: '도감 12가지 모두 별 셋', reward: 150, test: G => !!G.dex && Object.values(G.dex).filter(v => v.length >= 3).length >= 12 },
+  { id: 'dex', name: '레시피 도감 완성', desc: '도감 20가지 모두 별 셋', reward: 200, test: G => !!G.dex && Object.values(G.dex).filter(v => v.length >= 3).length >= 20 },
+  { id: 'world', name: '세계의 식탁', desc: '네 나라의 요리를 하나씩 찾아내기', reward: 80, test: G => ['tomato_pasta', 'risotto', 'pad_thai', 'tom_yum', 'potato_curry', 'fish_curry', 'quesadilla', 'taco'].filter(r => G.recipes.includes(r)).map(r => RECIPES[r].world).filter((w, i, a) => a.indexOf(w) === i).length >= 4 },
   { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
 ];
 
@@ -209,6 +227,8 @@ const TAGS = {
   egg_rice: ['hearty', 'crispy'], doenjang_jjigae: ['soup', 'hearty'], radish_soup: ['soup', 'light'], miyeok_guk: ['soup', 'sea', 'light'],
   gamjajeon: ['crispy'], mushroom_rice: ['hearty'], namul_rice: ['light'], grilled_fish: ['sea', 'hearty'], gukbap: ['soup', 'hearty'],
   baechujeon: ['crispy', 'light'], spicy_fish: ['spicy', 'sea'], abalone_juk: ['light', 'sea'],
+  tomato_pasta: ['hearty'], risotto: ['hearty', 'light'], pad_thai: ['hearty', 'crispy'], tom_yum: ['soup', 'spicy', 'sea'],
+  potato_curry: ['hearty', 'spicy'], fish_curry: ['spicy', 'sea'], quesadilla: ['crispy', 'hearty'], taco: ['sea', 'crispy'],
 };
 for (const id in TAGS) RECIPES[id].tags = TAGS[id];
 // 나만의 요리는 도구와 재료로 성격이 정해져요
