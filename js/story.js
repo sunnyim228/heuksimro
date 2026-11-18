@@ -16,8 +16,8 @@ export const GOALS = {
   cauldron: '식당 주방의 가마솥을 열어 보자',
   gukbap: '가마솥에 모락국밥을 끓이자 — 쌀, 손질한 무, 손질한 버섯, 된장',
   epilogue: '1부 끝 — 2층에서 자고 나면 누군가 막차에서 내려요',
-  homestay: '은하가 궁금해하는 요리를 만들어, 가방에 넣고 은하에게 말 걸기 (식당 앞)',
-  after_stay: '은하를 배웅했어요. 진짜 레시피북은 수첩에 남아 있어요',
+  homestay: '별손님이 궁금해하는 요리를 만들어 가방에 넣고 말 걸기 (식당 앞) — 맛본 손님이 늘수록 도감 별이 올라요',
+  after_stay: '별손님들을 배웅했어요. 레시피 도감은 그대로 남아 있어요',
 };
 
 const batchim = s => { const c = s.charCodeAt(s.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; };

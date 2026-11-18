@@ -67,11 +67,10 @@ export const LOOKS = {
   geumja: { hair: '#d9d6d0', shirt: '#39424e', pants: '#39424e', hat: 'towel', hatCol: '#f7f3e6', old: true, skin: '#e2b089' },
   sori: { hair: '#4a3328', shirt: '#f2c94c', pants: '#e58d9c', style: 'pig', kid: true, overall: '#e58d9c' },
   doyun: { hair: '#3b2a25', shirt: '#b5553f', pants: '#4f5d4a', hat: 'beanie', hatCol: '#5a8a4b' },
-  eunha: { hair: '#c9d3ff', shirt: '#3d4f8c', pants: '#2f3a66', style: 'long', skin: '#eef0ff', scarf: '#f2c94c' },
   captain: { hair: '#e6e3dc', shirt: '#2f4670', pants: '#3a3f4a', hat: 'cap', hatCol: '#2f4670', beard: '#f1eee6', old: true, skin: '#dba983' },
   mom: { hair: '#4a3328', shirt: '#9a8fb5', pants: '#4a4a55', style: 'long' },
 };
-export const NPC_NAME = { ijang: '봉 이장', geumja: '금자 할머니', sori: '소리', doyun: '도윤', captain: '한 선장', mom: '엄마', eunha: '은하' };
+export const NPC_NAME = { ijang: '봉 이장', geumja: '금자 할머니', sori: '소리', doyun: '도윤', captain: '한 선장', mom: '엄마' };
 
 // 지나가는 손님들
 export const GUEST_LOOKS = [
@@ -134,6 +133,7 @@ export const CHALLENGES = [
   { id: 'debtfree', name: '빚 없는 아침', desc: '대출을 받았다가 모두 갚기', reward: 50, test: G => !!G.flags.borrowed && G.bank.loan === 0 },
   { id: 'reader', name: '얼굴만 봐도 안다', desc: '사정 있는 손님에게 딱 맞는 음식을 10번', reward: 60, test: G => (G.stats.fit || 0) >= 10 },
   { id: 'week', name: '일주일 동안 문 열기', desc: '서로 다른 7일에 모락식당 열기', reward: 50, test: G => (G.realDays || 0) >= 7 },
+  { id: 'dex', name: '레시피 도감 완성', desc: '도감 12가지 모두 별 셋', reward: 150, test: G => !!G.dex && Object.values(G.dex).filter(v => v.length >= 3).length >= 12 },
   { id: 'five', name: '다섯 별 식당', desc: '모락식당을 5성으로', reward: 200, test: G => rankOf(G.rep) >= 5 },
 ];
 
