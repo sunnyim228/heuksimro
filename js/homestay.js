@@ -2,9 +2,10 @@
 // 이 마을의 한 해는 28일(계절마다 7일)이에요. 손님 은하는 맛을 처음 배우는 별에서 온 손님이에요.
 // 레시피는 일반적인 가정식 기준이에요. 집집마다 간과 순서가 조금씩 달라요.
 
-export const YEAR_DAYS = 28;
+export const SEASON_DAYS = 10; // 손님 한 명이 머무는 날
+export const YEAR_DAYS = SEASON_DAYS * 4;
 export const SEASONS = ['봄', '여름', '가을', '겨울'];
-export const seasonOf = day => SEASONS[Math.min(3, Math.floor((Math.max(1, day) - 1) / 7))];
+export const seasonOf = day => SEASONS[Math.min(3, Math.floor((Math.max(1, day) - 1) / SEASON_DAYS))];
 
 // 계절마다 먼저 궁금해하는 요리 (제철)
 export const SEASON_DISHES = {
@@ -83,7 +84,7 @@ export const REAL = {
 // 별손님은 js/episodes/ 의 화 파일에서 채워져요 (연재 순서대로).
 export const VISITORS = [];
 // 한 해에 네 화: 첫 해는 1~4화, 두 번째 해는 5~8화 … 화가 모자라면 처음부터 다시 와요.
-export const visitorOf = (day, year = 1) => VISITORS[((year - 1) * 4 + Math.min(3, Math.floor((Math.max(1, day) - 1) / 7))) % VISITORS.length];
+export const visitorOf = (day, year = 1) => VISITORS[((year - 1) * 4 + Math.min(3, Math.floor((Math.max(1, day) - 1) / SEASON_DAYS))) % VISITORS.length];
 
 /* ───────── 레시피 도감: 별손님이 맛볼수록 별이 올라요 ───────── */
 // ★ 한 명: 실제 레시피  ★★ 두 명: 요령  ★★★ 세 명: 변주. 별 하나마다 요리 값 +10%

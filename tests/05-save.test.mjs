@@ -4,7 +4,7 @@ import { openGame, check } from './lib.mjs';
 export default async function ({ browser, url }) {
   const g = await openGame(browser, url);
   // 1) 옛 형식(v1) 저장 — 빈 칸이 많고 '진짜 레시피북'이 있던 시절
-  await g.ev(() => localStorage.setItem('morak-save-v1', JSON.stringify({ v: 1, name: '옛손님', day: 9, time: 480, coins: 77, inv: { rice: 2 }, recipes: ['egg_rice'], mem: [], flags: {}, step: 'homestay', map: 'village', x: 28, y: 16, taken: {}, fishLeft: 5, book: ['gamjajeon'], stay: { day: 3, len: 28, year: 1, today: 'egg_rice', taught: false } })));
+  await g.ev(() => localStorage.setItem('morak-save-v1', JSON.stringify({ v: 1, name: '옛손님', day: 9, time: 480, coins: 77, inv: { rice: 2 }, recipes: ['egg_rice'], mem: [], flags: {}, step: 'homestay', map: 'village', x: 28, y: 16, taken: {}, fishLeft: 5, book: ['gamjajeon'], stay: { day: 3, len: 40, year: 1, today: 'egg_rice', taught: false } })));
   await g.page.reload(); await g.page.waitForTimeout(500);
   check(await g.ev(() => !document.querySelector('#btn-continue').classList.contains('hide')), '옛 저장도 이어하기가 보여요');
   await g.page.click('#btn-continue'); await g.page.waitForTimeout(300); await g.drain();
