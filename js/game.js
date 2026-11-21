@@ -86,7 +86,6 @@ function buildVillage() {
   // 사람들
   const npc = (id, x, y) => { add(m, { type: 'npc', id, x, y, act: true, tall: true }); keep(x - 1, y - 1, x + 1, y + 1); };
   npc('ijang', 17, 16); npc('geumja', 11, 27); npc('sori', 9, 20); npc('doyun', 34, 8); npc('captain', 23, 35);
-  npc('visitor', 30, 19); m.things[m.things.length - 1].own = 'stay';
 
   // 소품
   const deco = (spr, x, y, o = {}) => { keep(x, y, x + (o.w || 1) - 1, y); return add(m, { type: o.type || 'deco', x, y, spr, ...o }); };
@@ -388,7 +387,8 @@ function fillDefaults(d) { // 기능이 늘며 생긴 칸을 채워요. 여러 �
   d.up = d.up || {}; d.rep = d.rep || 0; d.custom = d.custom || []; d.done = d.done || {}; if (d.trait === undefined) d.trait = null;
   d.bank = d.bank || { dep: 0, loan: 0 }; d.craft = d.craft || []; d.wear = d.wear || []; d.event = d.event || null; d.traveled = !!d.traveled;
   d.look = d.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
-  d.dex = d.dex || {}; d.world = d.world || {}; d.met = d.met || [];
+  d.dex = d.dex || {}; d.world = d.world || {}; d.met = d.met || []; d.album = d.album || {};
+  if (d.stay) { d.stay.bond = d.stay.bond || 0; d.stay.walk = d.stay.walk || 0; }
   if (d.book) { for (const id of d.book) d.dex[id] = d.dex[id] || ['eunha']; delete d.book; } // 예전 '진짜 레시피북'을 도감으로
   d.body = d.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
   if (!d.rep && d.stats.served) d.rep = d.stats.served;
@@ -460,7 +460,8 @@ function refreshHUD() {
   const ap = h < 12 ? '오전' : '오후', hh = h % 12 === 0 ? 12 : h % 12;
   $('#status').innerHTML = `${G.day}일째 · ${ap} ${hh}:${String(mi).padStart(2, '0')}<br><img class="ic s" src="${iconURL('coin')}"> <b>${G.coins}</b>닢${G.bank && G.bank.loan ? ` · 빚 ${G.bank.loan}` : ''}${G.event ? `<br><small>오늘: ${EVENTS[G.event].name}</small>` : ''}${G.stay ? `<br><small>별손님 ${visitorOf(G.stay.day, G.stay.year).name} · ${seasonOf(G.stay.day)} · 한 해 D-${Math.max(0, G.stay.len - G.stay.day)}</small>` : ''}<div class="bars">기운<i><em class="${G.body.en < 25 ? 'low' : ''}" style="width:${G.body.en}%"></em></i>밥맛<i><em class="${G.body.taste < 30 ? 'low' : 't'}" style="width:${G.body.taste}%"></em></i></div>`;
   $('[data-open="dex"]').classList.toggle('hide', !G.stay && !Object.keys(G.dex || {}).length);
-  const goal = GOALS[G.step] || '';
+  const guest = G.stay ? `별손님 ${visitorOf(G.stay.day, G.stay.year).name} ${'♥'.repeat(hearts())}${'♡'.repeat(4 - hearts())} · ${G.stay.taught ? '오늘 수업 끝' : G.stay.today && RECIPES[G.stay.today] ? `오늘 궁금한 것 「${RECIPES[G.stay.today].name}」` : '막 도착했어요'}` : '';
+  const goal = [G.step === 'homestay' || G.step === 'after_stay' ? '' : GOALS[G.step] || '', guest].filter(Boolean).join('\n');
   $('#goal').classList.toggle('hide', !goal || !!svc);
   $('#goal .txt').textContent = goal;
   $('#svcbar').classList.toggle('hide', !svc);
@@ -969,7 +970,7 @@ function checkProgress() {
   checkChallenges();
   refreshHUD();
 }
-const QUEST_NPC = { homestay: 'visitor', gather: 'ijang', q_geumja: 'geumja', q_sori: 'sori', q_doyun: 'doyun', q_captain: 'captain', q_ijang2: 'ijang' };
+const QUEST_NPC = { gather: 'ijang', q_geumja: 'geumja', q_sori: 'sori', q_doyun: 'doyun', q_captain: 'captain', q_ijang2: 'ijang' };
 
 /* ═════════ 상호작용 ═════════ */
 function interact(th) {
@@ -1010,7 +1011,7 @@ function harvest(th) {
   const crop = th.id.startsWith('crop');
   tire(3, true);
   const n = th.n + (G.trait === 'thrift' ? 1 : 0) + (owns(th.id.startsWith('crop') ? 'garden' : 'basket') ? 1 : 0) + (G.event === 'harvest' && crop ? 1 : 0)
-    + (crop && wearing('hat_straw') ? 1 : 0) + ((th.item === 'clam' || th.item === 'miyeok') && wearing('hat_towel') ? 1 : 0);
+    + (crop && wearing('hat_straw') ? 1 : 0) + ((th.item === 'clam' || th.item === 'miyeok') && wearing('hat_towel') ? 1 : 0) + (hearts() >= 3 ? 1 : 0);
   G.taken[th.id] = 1; addItem(th.item, n); Au.sfx('pick');
   floater(th.x * T + 8, th.y * T, `+${n} ${itemName(th.item)}`);
   checkProgress();
@@ -1038,7 +1039,7 @@ async function changeMap(name, x, y, dir) {
   clearFloaters(); particles.length = 0;
   map = MAPS[name]; G.map = name;
   P.x = x; P.y = y; P.px = x * T; P.py = y * T; P.dir = dir; P.moving = false; P.path = null; P.onArrive = null;
-  snapCam();
+  snapCam(); placeBuddy();
   Au.setMood(name === 'shop' ? (svc ? 'service' : 'day') : (G.time >= 19 * 60 ? 'night' : 'day'));
   await UI.black(false);
   busy--;
@@ -1066,7 +1067,7 @@ function usePantry() {
 function useBoard() {
   if (!P.hands) return toast('도마: 손질할 재료를 들고 와요.');
   if (!(ITEMS[P.hands] && ITEMS[P.hands].chop)) return no(`${itemName(P.hands)}: 손질할 필요가 없어요.`);
-  P.act = { t: 0, dur: 0.9 / TEST_SPEED * (owns('knife') ? 0.5 : 1) * (G.trait === 'quick' ? 0.4 : 1), tick: 0, done() { P.hands += '_c'; Au.sfx('put'); } };
+  P.act = { t: 0, dur: 0.9 / TEST_SPEED * (owns('knife') ? 0.5 : 1) * (G.trait === 'quick' ? 0.4 : 1) * (hearts() >= 2 ? 0.4 : 1), tick: 0, done() { P.hands += '_c'; Au.sfx('put'); } };
 }
 function useCounter(c) {
   const h = P.hands; P.hands = c.item; c.item = h;
@@ -1350,47 +1351,84 @@ async function arrive(v) {
 }
 async function startHomestay() {
   G.dex = G.dex || {};
-  G.stay = { day: 1, len: YEAR_DAYS, year: 1, today: null, taught: false };
-  G.up.stay = 1; G.step = 'homestay';
+  G.stay = { day: 1, len: YEAR_DAYS, year: 1, today: null, taught: false, bond: 0, walk: 0 };
+  G.up.stay = 1;
+  await UI.narr('그날 저녁, 막차에서 낯선 손님이 내렸다.');
   await arrive(visitorOf(1));
-  await UI.say('ijang', `허허, 별에서 손님이 왔구나! …사람은 아니구먼. 그래도 배고픈 건 똑같겠지. 이 마을의 한 해는 스무여드레야. 계절마다 다른 별에서 손님이 온단다. ${G.name}, 식당 2층 빈방 내주거라.`);
+  await UI.say('ijang', `허허, 별에서 손님이 왔구나! …사람은 아니구먼. 그래도 배고픈 건 똑같겠지. ${G.name}, 식당 2층 빈방 내주거라. 누님도 그랬을 게다.`);
+  await UI.say('ijang', '이 마을의 한 해는 마흔 날이야. 계절마다 다른 별에서 손님이 온단다. 열흘씩 데리고 살면서 밥 짓는 걸 가르쳐 줘라.');
   await UI.say('me', '좋아요. 매일 하나씩, 제대로 가르쳐 줄게요.');
   pickLesson();
   await UI.say('visitor', waitLine(RECIPES[G.stay.today].name));
-  toast('별손님이 식당 앞에서 기다려요.\n궁금해하는 요리를 만들어 가방에 넣고 말을 걸어요. 서로 다른 손님이 맛볼수록 레시피 도감의 별이 올라요.', 'page', 8000);
+  placeBuddy();
+  toast('별손님이 이제 나를 따라다녀요.\n궁금해하는 요리를 만들어 주고, 같이 먹고, 같이 걸으면 정(♥)이 쌓여요. 손님을 누르면 말을 걸어요.', 'heart', 8000);
 }
 async function homestayMorning() {
-  if (G.step === 'epilogue' && !G.stay && !G.flags.stayDone) return startHomestay();
+  if (!G.stay && !G.flags.stayDone && opened()) return startHomestay();
   if (!G.stay) return;
-  G.stay.day++;
+  G.stay.day++; G.stay.walk = 0; G.stay.walkBond = 0; G.stay.ate = false; G.stay.talked = false;
   if (G.stay.day > G.stay.len) return yearEnd();
   const prev = visitorOf(G.stay.day - 1, G.stay.year), v = visitorOf(G.stay.day, G.stay.year);
   if (prev.id !== v.id) {
-    showVisitor(prev);
-    await UI.narr(`솥골에 ${seasonOf(G.stay.day)}이 왔다.\n${prev.name}가 짐을 쌌다.`);
-    await UI.say('visitor', prev.bye);
+    await seeOff(prev);
+    await UI.narr(`솥골에 ${seasonOf(G.stay.day)}이 왔다.`);
+    G.stay.bond = 0;
     await arrive(v);
   } else showVisitor(v);
   pickLesson();
   await UI.say('visitor', waitLine(RECIPES[G.stay.today].name));
+  placeBuddy();
+}
+/* ── 정(♥): 수업·같이 먹기·같이 걷기·매일 인사로 쌓이고, 한 칸마다 속 이야기가 열려요 ── */
+const hearts = () => (G && G.stay ? Math.min(4, Math.floor((G.stay.bond || 0) / 25)) : 0);
+async function addBond(n) {
+  const st = G.stay; if (!st) return;
+  const h0 = hearts(); st.bond = Math.min(100, (st.bond || 0) + n);
+  const h1 = hearts();
+  for (let h = h0 + 1; h <= h1; h++) await bondScene(h);
+}
+async function bondScene(h) {
+  const v = visitorOf(G.stay.day, G.stay.year); showVisitor(v);
+  Au.sfx('heart');
+  await UI.narr(`${v.name}와 조금 더 가까워졌다. ${'♥'.repeat(h)}${'♡'.repeat(4 - h)}`);
+  for (const line of (v.bonds || [])[h - 1] || []) {
+    if (line.startsWith('나:')) await UI.say('me', line.slice(2)); else await UI.say('visitor', line);
+  }
+  const perk = ['', '', '이제 도마 앞에 서면 손질을 도와줘요.', '이제 채집할 때 하나씩 더 거들어 줘요.', '떠나는 날, 선물을 남기고 싶어 해요.'][h];
+  if (perk) toast(`${v.name} ${'♥'.repeat(h)} — ${perk}`, 'heart', 5000);
+  G.album[v.id] = Math.max(G.album[v.id] || 0, h);
+}
+async function seeOff(v) { // 손님을 배웅해요. 정이 가득하면 선물
+  showVisitor(v);
+  await UI.say('visitor', v.bye);
+  if (hearts() >= 4 && v.gift) { await UI.narr(v.gift); toast(`앨범에 ${v.name}와의 열흘이 남았어요`, 'heart', 4000); }
+  G.album[v.id] = Math.max(G.album[v.id] || 0, hearts());
 }
 async function talkVisitor() {
   const st = G.stay;
   if (!st) return;
   const v = visitorOf(st.day, st.year); showVisitor(v);
-  if (st.taught) return UI.say('visitor', '오늘 배운 건 도감에 적어 뒀어요. 내일도 알려 줄 거죠?');
+  if (!st.talked) { st.talked = true; await addBond(5); }
   const id = st.today, name = RECIPES[id].name;
-  if (inv(id) <= 0) {
-    if (Math.random() < 0.4) await UI.say('visitor', pickOne(v.idle));
+  const dishes = Object.keys(G.inv).filter(i => RECIPES[i] && G.inv[i] > 0);
+  const opts = [];
+  if (!st.taught && inv(id) > 0) opts.push(['lesson', `「${name}」로 같이 먹으며 가르쳐 준다`]);
+  if (!st.ate && dishes.some(d => d !== id || st.taught)) opts.push(['eat', '같이 밥 먹기']);
+  opts.push(['talk', '이야기하기']);
+  const pick = opts.length > 1 ? opts[await UI.choose(opts.map(o => o[1]))][0] : 'talk';
+  if (pick === 'eat') return eatWithGuest(v, dishes.filter(d => d !== id || st.taught));
+  if (pick === 'talk') {
+    if (st.taught) return UI.say('visitor', pickOne(['오늘 배운 건 도감에 적어 뒀어요. 내일도 알려 줄 거죠?', ...v.idle]));
+    if (Math.random() < 0.5) await UI.say('visitor', pickOne(v.idle));
     return UI.say('visitor', waitLine(name));
   }
-  if (await UI.choose([`「${name}」로 같이 먹으며 가르쳐 준다`, '아직은…']) !== 0) return;
   addItem(id, -1);
   const r = REAL[id], lv0 = dexLv(id);
   await UI.narr(`${v.name}와 마주 앉아 ${josa(name, '을/를')} 나눠 먹었다.`);
   await UI.say('visitor', v.ask(name, r));
   const list = G.dex[id] || (G.dex[id] = []);
-  if (!list.includes(v.id)) list.push(v.id);
+  const fresh = !list.includes(v.id);
+  if (fresh) list.push(v.id);
   const lv = dexLv(id);
   if (lv0 === 0) {
     await UI.narr(`재료(2인분)\n${r.ing.join(' · ')}`);
@@ -1398,34 +1436,78 @@ async function talkVisitor() {
   } else await UI.narr('지난번에 적어 둔 순서대로 만들어 보였다.');
   if (lv > lv0 && lv === 2) await UI.narr(`요령 하나 더.\n${DEX_MORE[id].tip}`);
   if (lv > lv0 && lv === 3) await UI.narr(`이렇게도 만들 수 있어.\n${DEX_MORE[id].vary}`);
-  st.taught = true;
+  st.taught = true; st.ate = true;
   feed(id, true); gainRep(2);
   await UI.say('visitor', pickOne(v.react));
   Au.sfx('page');
   if (lv > lv0) toast(`레시피 도감 「${name}」 ${dexStars(lv)}\n${['', '실제 레시피가 열렸어요', '요령이 열렸어요 · 값 +10%', '변주가 열렸어요 · 값 +20%'][lv]}`, 'page', 5000);
   else toast(`「${name}」${pp(name, '은/는')} 이미 ${v.name}도 맛본 요리예요. 다른 손님에게 가르치면 별이 올라요.`, null, 4500);
+  await addBond(fresh ? 15 : 8);
   checkChallenges();
 }
+async function eatWithGuest(v, dishes) {
+  let id = dishes[0];
+  if (dishes.length > 1) {
+    id = await openPanel(`${v.name}와 무엇을 먹을까?`, `<div class="grid">${dishes.map(d => cell(d, G.inv[d], 'pick')).join('')}</div>`, (a, val, p) => { if (a === 'pick') p.close(val); });
+    if (!id) return;
+  }
+  addItem(id, -1); G.stay.ate = true;
+  feed(id, true);
+  await UI.narr(`${v.name}와 마주 앉아 ${josa(RECIPES[id].name, '을/를')} 먹었다.`);
+  await UI.say('visitor', pickOne(v.react));
+  await addBond(10);
+}
+/* ── 따라다니는 별손님 ── */
+const bud = { x: 0, y: 0, px: 0, py: 0, dir: 'down', walkT: 0, idle: true, trail: [] };
+function placeBuddy() {
+  if (!G || !G.stay) return;
+  const [dx, dy] = DIRS[P.dir];
+  const cand = [[P.x - dx, P.y - dy], [P.x + 1, P.y], [P.x - 1, P.y], [P.x, P.y + 1], [P.x, P.y - 1]].find(([x, y]) => passable(x, y)) || [P.x, P.y];
+  bud.x = cand[0]; bud.y = cand[1]; bud.px = bud.x * T; bud.py = bud.y * T; bud.trail = []; bud.dir = P.dir;
+}
+function noteStep(fx, fy) { // 주인공이 지나간 칸을 기억해, 손님이 두 칸 뒤를 따라와요
+  if (!G || !G.stay) return;
+  bud.trail.push([fx, fy]); if (bud.trail.length > 6) bud.trail.shift();
+  const st = G.stay; st.walk = (st.walk || 0) + 1;
+  if (st.walk % 25 === 0 && (st.walkBond || 0) < 8) {
+    st.walkBond = (st.walkBond || 0) + 2;
+    const up = Math.floor(Math.min(100, st.bond + 2) / 25) > hearts(); // 하트가 오를 때만 장면을 띄우고, 아니면 조용히 쌓여요
+    if (up && !busy) { P.path = null; runScene(() => addBond(2)); } else if (!up) st.bond = Math.min(100, st.bond + 2);
+  }
+}
+function updateBuddy(dt) {
+  if (!G.stay) return;
+  if (Math.abs(bud.x - P.x) + Math.abs(bud.y - P.y) > 8) placeBuddy();
+  const near = Math.abs(bud.x - P.x) + Math.abs(bud.y - P.y) <= 1;
+  if (!near && bud.trail.length) {
+    const tx = bud.trail[0][0] * T, ty = bud.trail[0][1] * T, dx = tx - bud.px, dy = ty - bud.py, d = Math.hypot(dx, dy), sp = 80 * dt;
+    if (d > sp) { bud.px += dx / d * sp; bud.py += dy / d * sp; bud.walkT += dt; bud.idle = false; bud.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); }
+    else { bud.px = tx; bud.py = ty; [bud.x, bud.y] = bud.trail.shift(); }
+  } else {
+    bud.idle = true;
+    if (near) { if (bud.trail.length && Math.abs(bud.trail[0][0] - P.x) + Math.abs(bud.trail[0][1] - P.y) <= 1) bud.trail = []; bud.dir = P.x > bud.x ? 'right' : P.x < bud.x ? 'left' : P.y > bud.y ? 'down' : 'up'; }
+  }
+}
+const atBuddy = (x, y) => G && G.stay && ((bud.x === x && (bud.y === y || bud.y === y + 1)));
 async function yearEnd() {
   const st = G.stay, last = visitorOf(st.len, st.year);
-  showVisitor(last);
   await UI.narr('이 마을의 한 해가 다 갔다.');
-  await UI.say('visitor', last.bye);
+  await seeOff(last);
   const found = DEX_ORDER.filter(id => dexLv(id)).length, stars = DEX_ORDER.reduce((t, id) => t + dexLv(id), 0);
   await UI.narr(`${st.year > 1 ? `${st.year}번째 ` : ''}한 해 동안 네 별손님이 다녀갔다.\n레시피 도감 ${found}/${DEX_ORDER.length} · 별 ${stars}/${DEX_ORDER.length * 3}`);
   const c = await UI.choose(['한 해 더 (별손님들이 다시 와요)', '여기서 계속 지낸다 (손님맞이는 쉬어요)', '새로 시작한다 (도감은 이어져요)']);
   if (c === 0) {
-    st.year++; st.day = 1;
+    st.year++; st.day = 1; st.bond = 0;
     await UI.narr('다시 봄이 왔다.');
     await arrive(visitorOf(1, st.year));
-    pickLesson();
+    pickLesson(); placeBuddy();
     await UI.say('visitor', waitLine(RECIPES[st.today].name));
     return;
   }
   const l = loadLegacy();
   for (const id in G.dex) l.dex[id] = [...new Set([...(l.dex[id] || []), ...G.dex[id]])];
   l.runs = (l.runs || 0) + 1; saveLegacy(l);
-  G.stay = null; G.up.stay = 0; G.flags.stayDone = true; G.step = 'after_stay';
+  G.stay = null; G.up.stay = 0; G.flags.stayDone = true;
   if (c === 2) {
     await UI.narr(`레시피 도감을 챙겼다.\n새로운 이야기가 시작된다.`);
     try { localStorage.removeItem(SAVE); localStorage.removeItem(BACKUP); } catch (e) { /* 무시 */ }
@@ -1434,6 +1516,12 @@ async function yearEnd() {
 }
 function discoverable() { // 별손님이 알려 준 나라의 요리 중 아직 못 찾은 것
   return Object.keys(G.world || {}).filter(w => G.world[w]).flatMap(w => WORLD[w].dishes).filter(r => !G.recipes.includes(r));
+}
+function albumHTML() {
+  const met = VISITORS.filter(v => (G.met || []).includes(v.id));
+  if (!met.length) return '';
+  return `<div class="sec">별손님 앨범</div><div class="grid">${met.map(v => { const h = G.album[v.id] || 0, here = G.stay && visitorOf(G.stay.day, G.stay.year).id === v.id;
+    return `<div class="cell"><img src="${CHARS[v.id].down[0].toDataURL()}" style="image-rendering:pixelated;width:2.4rem"><br>${v.name}${here ? ' (지금 함께)' : ''}<br><span style="color:var(--accent)">${'♥'.repeat(here ? hearts() : h)}${'♡'.repeat(4 - (here ? hearts() : h))}</span></div>`; }).join('')}</div>`;
 }
 const dexFound = id => G.recipes.includes(id) || dexLv(id) > 0;
 function openDex() {
@@ -1446,7 +1534,7 @@ function openDex() {
   };
   const grid = () => `<p>찾은 요리 <b>${found()}</b>/${DEX_ORDER.length} · 별 <b>${stars()}</b>/${DEX_ORDER.length * 3}<br>
     <small>요리는 직접 찾아내요. 별손님이 들려준 단서대로 부엌에서 재료를 조합하면 「새 요리 발견!」. 찾은 요리를 서로 다른 별손님에게 가르칠수록 별이 올라요 (★ 실제 레시피 · ★★ 요령 · ★★★ 변주, 별마다 값 +10%).</small></p>` +
-    DEX_GROUPS.map(([title, ids, w]) => {
+    albumHTML() + DEX_GROUPS.map(([title, ids, w]) => {
       const open = !w || (G.world && G.world[w]);
       if (w && !open && !ids.some(dexFound)) return `<div class="sec">${title} — 아직 이 나라를 들른 별손님이 없어요</div>`;
       return `<div class="sec">${title}${w ? ` · ${VISITORS.find(v => v.id === WORLD[w].visitor).name}가 들려준 나라` : ''}</div><div class="grid">${ids.map(id => cellOf(id, open)).join('')}</div>`;
@@ -1487,6 +1575,7 @@ function tapWorld(cx, cy) {
     const g = svc.cust.find(c => c.state !== 'in' && c.state !== 'out' && c.x === tx && (c.y === ty || c.y === ty + 1));
     if (g) th = g.table;
   }
+  if (!th && !svc && atBuddy(tx, ty)) { tapMark = { x: bud.x * T + 8, y: bud.y * T + 8, t: 0.4 }; return runScene(talkVisitor); }
   if (th) {
     tapMark = { x: th.x * T + th.w * 8, y: th.y * T + th.h * 8, t: 0.4 };
     if (adjacent(th, P.x, P.y) && !P.moving) { faceThing(th); return interact(th); }
@@ -1534,7 +1623,8 @@ function actionA() {
   const [dx, dy] = DIRS[P.dir];
   let th = actAt(P.x + dx, P.y + dy);
   if (!th && svc) { const g = svc.cust.find(c => c.x === P.x + dx && c.y === P.y + dy); if (g) th = g.table; }
-  if (th) interact(th);
+  if (th) return interact(th);
+  if (G.stay && !svc && Math.abs(bud.x - P.x) + Math.abs(bud.y - P.y) <= 1) runScene(talkVisitor);
 }
 function actionB() { // 닫기·물러나기
   if (panelClose) return panelClose();
@@ -1596,7 +1686,7 @@ function keyDir() {
 function stepTo(nx, ny) {
   if (!passable(nx, ny)) return false;
   if (svc && svc.cust.some(c => (c.state === 'wait' || c.state === 'eat') && c.x === nx && c.y === ny)) return false;
-  P.fx = P.x; P.fy = P.y; P.x = nx; P.y = ny; P.moving = true; P.mt = 0;
+  P.fx = P.x; P.fy = P.y; noteStep(P.x, P.y); P.x = nx; P.y = ny; P.moving = true; P.mt = 0;
   return true;
 }
 function updatePlayer(dt) {
@@ -1662,6 +1752,7 @@ function update(dt) {
     updatePlayer(dt);
     if (map.name === 'village') updateWalkers(dt);
     if (map.name === 'shop') updateCookers(dt);
+    updateBuddy(dt);
     if (svc) updateService(dt);
     saveT += dt; if (saveT > 20) { saveT = 0; save(); }
   }
@@ -1718,6 +1809,7 @@ function render() {
     if (svc && map.name === 'shop') for (const g of svc.cust) list.push({ k: g.py + T + 0.4, g });
     if (svc && svc.auto && map.name === 'shop') list.push({ k: svc.helperG.py + T + 0.3, g: svc.helperG });
     if (map.name === 'village') for (const w of walkers) list.push({ k: w.py + T + 0.3, g: w });
+    if (G.stay) list.push({ k: bud.py + T + 0.35, g: { ...bud, spr: CHARS.visitor } });
   }
   list.sort((a, b) => a.k - b.k);
 
@@ -1763,6 +1855,7 @@ function render() {
         bar(bx + 3, by + 14, 12, pr, pr > 0.5 ? '#5fa644' : pr > 0.22 ? '#f2a03c' : '#c4553f');
       } else if (g.state === 'eat') drawIcon('heart', g.px + 2, g.py - 22 + Math.sin(tAnim * 6));
     }
+    if (G.stay && !G.stay.taught) drawIcon(inv(G.stay.today) > 0 ? 'bang' : 'q', Math.round(bud.px) + 2, Math.round(bud.py) - 22 + Math.round(Math.sin(tAnim * 5) * 2));
     const q = QUEST_NPC[G.step];
     if (q && map.name === 'village' && !(G.step === 'gather' && G.flags.gift)) {
       const n = map.things.find(t => t.type === 'npc' && t.id === q);
@@ -1816,7 +1909,7 @@ function startGame(state, isNew) {
   map = MAPS[G.map] || MAPS.village;
   P.x = G.x; P.y = G.y; P.px = P.x * T; P.py = P.y * T; P.dir = 'down'; P.hands = null; P.moving = false; P.path = null;
   if (!passable(P.x, P.y)) { if (map.name === 'shop') { P.x = 7; P.y = 9; } else { P.x = 28; P.y = 16; } P.px = P.x * T; P.py = P.y * T; }
-  snapCam();
+  snapCam(); placeBuddy();
   $('#title').classList.add('hide'); $('#hud').classList.remove('hide');
   Au.unlock(); Au.setMood(G.time >= 19 * 60 ? 'night' : 'day');
   refreshHUD();
@@ -1857,6 +1950,6 @@ function boot() {
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
+  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, bud, talkBuddy: () => runScene(talkVisitor), get hearts() { return hearts(); }, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
 }
 boot();

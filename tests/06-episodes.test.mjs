@@ -20,6 +20,7 @@ export default async function ({ browser, url }) {
       }
       for (const it of ep.items) if (typeof it !== 'string' && blank(it.id)) out.push(`${it.id}: 재료 그림이 비었어요`);
       if (!ep.visitor.hello.length || !ep.visitor.bye) out.push(`${ep.id}: 손님 대사가 비었어요`);
+      if (!ep.visitor.bonds || ep.visitor.bonds.length !== 4 || !ep.visitor.gift) out.push(`${ep.id}: 정(♥) 장면 4개와 선물이 필요해요`);
     }
     for (const id of DEX_ORDER) if (!RECIPES[id]) out.push(`${id}: 도감에 있는데 레시피가 없어요`);
     return { problems: [...EPISODE_PROBLEMS, ...out], count: EPISODES.length, dex: DEX_ORDER.length };

@@ -24,7 +24,7 @@ export default async function ({ browser, url }) {
   for (const i of ['pasta', 'tomato', 'cheese']) check(await put(i, 'pot') === null, `${i}는 냄비에 들어가요`);
   check((await g.G()).recipes.includes('tomato_pasta'), '맞는 조합이면 「새 요리 발견!」');
   // 여름 손님 → 태국 열림
-  await g.ev(() => { window.__morak.P.hands = null; window.__morak.G.stay.day = 7; }); await g.sleepNow();
+  await g.ev(() => { window.__morak.P.hands = null; window.__morak.G.stay.day = 10; }); await g.sleepNow();
   check((await g.G()).world.thai, '여름 손님이 태국을 열어요');
   check(!g.errors.length, '페이지 오류: ' + g.errors.join(' / '));
   await g.ctx.close();
