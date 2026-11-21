@@ -4,6 +4,7 @@ import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemNam
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
 import { EPISODES } from './episodes/index.js'; // 연재 화들을 먼저 등록해요
+import { VILLAGE_CLUES, CHAPTERS } from './mystery.js';
 import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER, WORLD, HINTS, DEX_GROUPS } from './homestay.js';
 
 const $ = s => document.querySelector(s);
@@ -387,7 +388,7 @@ function fillDefaults(d) { // 기능이 늘며 생긴 칸을 채워요. 여러 �
   d.up = d.up || {}; d.rep = d.rep || 0; d.custom = d.custom || []; d.done = d.done || {}; if (d.trait === undefined) d.trait = null;
   d.bank = d.bank || { dep: 0, loan: 0 }; d.craft = d.craft || []; d.wear = d.wear || []; d.event = d.event || null; d.traveled = !!d.traveled;
   d.look = d.look || { hair: '#7a4b2e', style: 'short', shirt: 'shirt_white', hat: 'hat_band', apron: true };
-  d.dex = d.dex || {}; d.world = d.world || {}; d.met = d.met || []; d.album = d.album || {};
+  d.dex = d.dex || {}; d.world = d.world || {}; d.met = d.met || []; d.album = d.album || {}; d.clues = d.clues || [];
   if (d.stay) { d.stay.bond = d.stay.bond || 0; d.stay.walk = d.stay.walk || 0; }
   if (d.book) { for (const id of d.book) d.dex[id] = d.dex[id] || ['eunha']; delete d.book; } // 예전 '진짜 레시피북'을 도감으로
   d.body = d.body || { en: 100, taste: 35, meals: 0, ate: [], shared: false };
@@ -975,6 +976,7 @@ const QUEST_NPC = { gather: 'ijang', q_geumja: 'geumja', q_sori: 'sori', q_doyun
 /* ═════════ 상호작용 ═════════ */
 function interact(th) {
   if (busy || !th) return;
+  const vc = villageClue(th); if (vc) return runScene(vc);
   switch (th.type) {
     case 'npc': if (th.id === 'visitor') return runScene(talkVisitor);
       return runScene(async () => {
@@ -1311,8 +1313,8 @@ function loadLegacy() {
   try {
     const l = JSON.parse(localStorage.getItem(LEGACY)) || {};
     const dex = l.dex || Object.fromEntries((l.book || []).map(id => [id, ['eunha']]));
-    return { dex, runs: l.runs || 0 };
-  } catch (e) { return { dex: {}, runs: 0 }; }
+    return { dex, runs: l.runs || 0, clues: l.clues || [] };
+  } catch (e) { return { dex: {}, runs: 0, clues: [] }; }
 }
 function saveLegacy(l) { try { localStorage.setItem(LEGACY, JSON.stringify(l)); } catch (e) { /* 저장 공간이 없으면 건너뜀 */ } }
 function dexLv(id) { return Math.min(3, ((G && G.dex && G.dex[id]) || []).length); }
@@ -1338,6 +1340,7 @@ async function arrive(v) {
     G.met.push(v.id);
     await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
     for (const line of v.hello) await UI.say('visitor', line);
+    if (v.clues && v.clues.arrive) { await UI.say('visitor', v.clues.arrive); await addClue(v.id + '_arrive'); }
   }
   G.world = G.world || {};
   const w = WORLD[v.world];
@@ -1394,6 +1397,7 @@ async function bondScene(h) {
   for (const line of (v.bonds || [])[h - 1] || []) {
     if (line.startsWith('나:')) await UI.say('me', line.slice(2)); else await UI.say('visitor', line);
   }
+  if ((h === 2 || h === 4) && v.clues && v.clues['h' + h]) { await UI.say('visitor', v.clues['h' + h]); await addClue(v.id + '_h' + h); }
   const perk = ['', '', '이제 도마 앞에 서면 손질을 도와줘요.', '이제 채집할 때 하나씩 더 거들어 줘요.', '떠나는 날, 선물을 남기고 싶어 해요.'][h];
   if (perk) toast(`${v.name} ${'♥'.repeat(h)} — ${perk}`, 'heart', 5000);
   G.album[v.id] = Math.max(G.album[v.id] || 0, h);
@@ -1457,6 +1461,45 @@ async function eatWithGuest(v, dishes) {
   await UI.say('visitor', pickOne(v.react));
   await addBond(10);
 }
+/* ── 별의 소문: 단서를 모아 미스터리를 풀어요 (이야기는 js/mystery.js · 각 화 파일) ── */
+function allClues() { // [{id, text, where}] 손님 단서(화 순서대로) + 마을 단서
+  const out = [];
+  for (const v of VISITORS) {
+    const c = v.clues || {};
+    if (c.arrive) out.push({ id: v.id + '_arrive', text: `${v.name}가 들은 소문: ${c.arrive}`, where: `${v.name}를 맞이하기` });
+    if (c.h2) out.push({ id: v.id + '_h2', text: `${v.name}의 이야기: ${c.h2}`, where: `${v.name}와 ♥2` });
+    if (c.h4) out.push({ id: v.id + '_h4', text: `${v.name}의 이야기: ${c.h4}`, where: `${v.name}와 ♥4` });
+  }
+  for (const c of VILLAGE_CLUES) out.push({ id: c.id, text: c.text, where: `${c.where} (단서 ${c.need}개 이후)` });
+  return out;
+}
+async function addClue(id) {
+  G.clues = G.clues || [];
+  if (G.clues.includes(id)) return;
+  const c = allClues().find(x => x.id === id); if (!c) return;
+  G.clues.push(id); Au.sfx('page');
+  toast(`새 단서 (${G.clues.length}/${allClues().length})\n${c.text}`, 'q', 6000);
+  const ch = CHAPTERS.find(x => x.at === G.clues.length);
+  if (ch) {
+    await UI.narr(`별의 소문 — ${ch.title}`);
+    for (const line of ch.lines) { if (line.startsWith('나:')) await UI.say('me', line.slice(2)); else await UI.narr(line); }
+  }
+}
+function villageClue(th) { // 마을 단서: 조건이 되면 살펴보는 장면을 돌려줘요
+  if (!G || !G.stay && !(G.clues || []).length) return null;
+  const on = th.type === 'bus' ? 'bus' : th.type === 'look' && th.id === 'photo' ? 'photo' : th.type === 'book' ? 'book' : null;
+  const c = on && VILLAGE_CLUES.find(x => x.on === on && (G.clues || []).length >= x.need && !G.clues.includes(x.id));
+  return c ? async () => { await UI.narr(c.scene); await addClue(c.id); } : null;
+}
+function openClues() {
+  const list = allClues(), got = G.clues || [];
+  const nextCh = CHAPTERS.find(c => c.at > got.length);
+  const html = `<p>우주에 떠도는 소문 <b>「지구의 솥골, 김이 오르는 집」</b><br>모은 단서 <b>${got.length}</b>/${list.length}${nextCh ? ` · ${nextCh.at}개를 모으면 「${nextCh.title}」` : ' · 지금까지의 이야기를 모두 풀었어요'}</p>` +
+    `<div class="sec">풀어 낸 이야기</div>` + (CHAPTERS.filter(c => got.length >= c.at).map(c => `<div class="rcp"><h4>${c.title}</h4><div class="memo">${c.lines.map(l => l.replace(/^나:/, `${esc(G.name)}: `)).join('<br>')}</div></div>`).join('') || '<div class="rcp torn">단서 5개를 모으면 첫 이야기가 풀려요</div>') +
+    `<div class="sec">단서</div>` + list.map(c => got.includes(c.id) ? `<div class="rcp"><div class="how">${esc(c.text)}</div></div>` : `<div class="rcp torn">? — ${esc(c.where)}</div>`).join('');
+  return openPanel('별의 소문', html);
+}
+
 /* ── 따라다니는 별손님 ── */
 const bud = { x: 0, y: 0, px: 0, py: 0, dir: 'down', walkT: 0, idle: true, trail: [] };
 function placeBuddy() {
@@ -1506,6 +1549,7 @@ async function yearEnd() {
   }
   const l = loadLegacy();
   for (const id in G.dex) l.dex[id] = [...new Set([...(l.dex[id] || []), ...G.dex[id]])];
+  l.clues = [...new Set([...(l.clues || []), ...(G.clues || [])])];
   l.runs = (l.runs || 0) + 1; saveLegacy(l);
   G.stay = null; G.up.stay = 0; G.flags.stayDone = true;
   if (c === 2) {
@@ -1534,7 +1578,7 @@ function openDex() {
   };
   const grid = () => `<p>찾은 요리 <b>${found()}</b>/${DEX_ORDER.length} · 별 <b>${stars()}</b>/${DEX_ORDER.length * 3}<br>
     <small>요리는 직접 찾아내요. 별손님이 들려준 단서대로 부엌에서 재료를 조합하면 「새 요리 발견!」. 찾은 요리를 서로 다른 별손님에게 가르칠수록 별이 올라요 (★ 실제 레시피 · ★★ 요령 · ★★★ 변주, 별마다 값 +10%).</small></p>` +
-    albumHTML() + DEX_GROUPS.map(([title, ids, w]) => {
+    (G.stay || (G.clues || []).length ? `<p class="center"><button class="btn main" data-a="clues">별의 소문 — 단서 ${(G.clues || []).length}/${allClues().length}</button></p>` : '') + albumHTML() + DEX_GROUPS.map(([title, ids, w]) => {
       const open = !w || (G.world && G.world[w]);
       if (w && !open && !ids.some(dexFound)) return `<div class="sec">${title} — 아직 이 나라를 들른 별손님이 없어요</div>`;
       return `<div class="sec">${title}${w ? ` · ${VISITORS.find(v => v.id === WORLD[w].visitor).name}가 들려준 나라` : ''}</div><div class="grid">${ids.map(id => cellOf(id, open)).join('')}</div>`;
@@ -1557,6 +1601,7 @@ function openDex() {
   return openPanel('레시피 도감', grid(), (a, v, p) => {
     if (a === 'see') p.set(detail(v));
     if (a === 'hint') p.set(hint(v));
+    if (a === 'clues') { p.close(); openClues(); }
     if (a === 'back') p.set(grid());
   });
 }
@@ -1941,7 +1986,7 @@ function boot() {
       return;
     }
     const name = ($('#name').value || '').trim().slice(0, 6) || '하루';
-    const st = newState(name); st.dex = JSON.parse(JSON.stringify(loadLegacy().dex)); startGame(st, true);
+    const st = newState(name); st.dex = JSON.parse(JSON.stringify(loadLegacy().dex)); st.clues = loadLegacy().clues.slice(); startGame(st, true);
   });
   if ('serviceWorker' in navigator && !window.__TOSS__) navigator.serviceWorker.register('sw.js').catch(() => {});
   addEventListener('visibilitychange', () => { if (document.hidden) save(); else welcomeBack(); });
@@ -1950,6 +1995,6 @@ function boot() {
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, bud, talkBuddy: () => runScene(talkVisitor), get hearts() { return hearts(); }, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
+  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, bud, openClues, allClues: () => allClues(), talkBuddy: () => runScene(talkVisitor), get hearts() { return hearts(); }, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
 }
 boot();
