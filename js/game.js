@@ -4,7 +4,8 @@ import { ITEMS, SHOP_LIST, RECIPES, RECIPE_ORDER, COOKER_NAME, MEMORIES, itemNam
 import { makeStory, GOALS, josa } from './story.js';
 import * as Au from './audio.js';
 import { EPISODES } from './episodes/index.js'; // 연재 화들을 먼저 등록해요
-import { VILLAGE_CLUES, CHAPTERS } from './mystery.js';
+import { VILLAGE_CLUES, CHAPTERS, FINALE } from './mystery.js';
+import * as Cine from './cinema.js';
 import { YEAR_DAYS, seasonOf, SEASON_DISHES, REAL, VISITORS, visitorOf, DEX_MORE, DEX_ORDER, WORLD, HINTS, DEX_GROUPS } from './homestay.js';
 
 const $ = s => document.querySelector(s);
@@ -1338,7 +1339,7 @@ async function arrive(v) {
   if (G.met.includes(v.id)) { await UI.narr(`저녁 막차에서 낯익은 더듬이가 보였다.`); await UI.say('visitor', `또 왔어요! ${v.name}예요. 이번에도 가르쳐 줄 거죠?`); }
   else {
     G.met.push(v.id);
-    await UI.narr(`저녁 막차가 들어왔다.\n${v.from}에서 온 손님이 내렸다.`);
+    await Cine.play(Cine.SCENES.arrive(v), ['저녁 별 막차가 들어왔다.', `${v.from}에서 온 손님이 내렸다.`]);
     for (const line of v.hello) await UI.say('visitor', line);
     if (v.clues && v.clues.arrive) { await UI.say('visitor', v.clues.arrive); await addClue(v.id + '_arrive'); }
   }
@@ -1480,24 +1481,33 @@ async function addClue(id) {
   G.clues.push(id); Au.sfx('page');
   toast(`새 단서 (${G.clues.length}/${allClues().length})\n${c.text}`, 'q', 6000);
   const ch = CHAPTERS.find(x => x.at === G.clues.length);
-  if (ch) {
-    await UI.narr(`별의 소문 — ${ch.title}`);
-    for (const line of ch.lines) { if (line.startsWith('나:')) await UI.say('me', line.slice(2)); else await UI.narr(line); }
-  }
+  if (ch) await playChapter(ch);
+}
+const castLine = l => typeof l === 'string' && l.startsWith('나:') ? { who: G.name, text: l.slice(2) } : l && l.who === '나' ? { ...l, who: G.name } : l;
+function playChapter(ch) { // 별의 소문 한 장을 모션그래픽으로
+  return Cine.play(Cine.SCENES[ch.scene](), [{ title: `별의 소문 — ${ch.title}` }, ...ch.lines.map(castLine)]);
+}
+async function playFinale() { // 시즌 1 마지막 화
+  for (const s of FINALE.shots) await Cine.play(Cine.SCENES[s.scene](), s.lines.map(castLine));
+  G.flags.finale1 = true;
 }
 function villageClue(th) { // 마을 단서: 조건이 되면 살펴보는 장면을 돌려줘요
   if (!G || !G.stay && !(G.clues || []).length) return null;
   const on = th.type === 'bus' ? 'bus' : th.type === 'look' && th.id === 'photo' ? 'photo' : th.type === 'book' ? 'book' : null;
   const c = on && VILLAGE_CLUES.find(x => x.on === on && (G.clues || []).length >= x.need && !G.clues.includes(x.id));
-  return c ? async () => { await UI.narr(c.scene); await addClue(c.id); } : null;
+  return c ? async () => { await Cine.play(Cine.SCENES.clue(c), c.scene.split('\n')); await addClue(c.id); } : null;
 }
 function openClues() {
   const list = allClues(), got = G.clues || [];
   const nextCh = CHAPTERS.find(c => c.at > got.length);
   const html = `<p>우주에 떠도는 소문 <b>「지구의 솥골, 김이 오르는 집」</b><br>모은 단서 <b>${got.length}</b>/${list.length}${nextCh ? ` · ${nextCh.at}개를 모으면 「${nextCh.title}」` : ' · 지금까지의 이야기를 모두 풀었어요'}</p>` +
-    `<div class="sec">풀어 낸 이야기</div>` + (CHAPTERS.filter(c => got.length >= c.at).map(c => `<div class="rcp"><h4>${c.title}</h4><div class="memo">${c.lines.map(l => l.replace(/^나:/, `${esc(G.name)}: `)).join('<br>')}</div></div>`).join('') || '<div class="rcp torn">단서 5개를 모으면 첫 이야기가 풀려요</div>') +
+    `<div class="sec">풀어 낸 이야기</div>` + (CHAPTERS.filter(c => got.length >= c.at).map((c, i) => `<div class="rcp"><h4>${c.title} <button class="btn" data-a="ch" data-v="${i}">▶ 다시 보기</button></h4><div class="memo">${c.lines.map(l => l.replace(/^나:/, `${esc(G.name)}: `)).join('<br>')}</div></div>`).join('') || '<div class="rcp torn">단서 5개를 모으면 첫 이야기가 풀려요</div>') +
     `<div class="sec">단서</div>` + list.map(c => got.includes(c.id) ? `<div class="rcp"><div class="how">${esc(c.text)}</div></div>` : `<div class="rcp torn">? — ${esc(c.where)}</div>`).join('');
-  return openPanel('별의 소문', html);
+  const fin = G.flags.finale1 ? `<div class="rcp"><h4>${FINALE.title} <button class="btn" data-a="fin">▶ 다시 보기</button></h4><div class="memo">첫 손님의 이름이 명부에 적혔어요. 시즌 2를 기다려 주세요.</div></div>` : '';
+  return openPanel('별의 소문', html.replace('<div class="sec">단서</div>', fin + '<div class="sec">단서</div>'), (a, v, p) => {
+    if (a === 'ch') { p.close(); runScene(() => playChapter(CHAPTERS[+v])); }
+    if (a === 'fin') { p.close(); runScene(playFinale); }
+  });
 }
 
 /* ── 따라다니는 별손님 ── */
@@ -1536,6 +1546,7 @@ async function yearEnd() {
   const st = G.stay, last = visitorOf(st.len, st.year);
   await UI.narr('이 마을의 한 해가 다 갔다.');
   await seeOff(last);
+  if (!G.flags.finale1 && (G.clues || []).length >= CHAPTERS[CHAPTERS.length - 1].at) await playFinale();
   const found = DEX_ORDER.filter(id => dexLv(id)).length, stars = DEX_ORDER.reduce((t, id) => t + dexLv(id), 0);
   await UI.narr(`${st.year > 1 ? `${st.year}번째 ` : ''}한 해 동안 네 별손님이 다녀갔다.\n레시피 도감 ${found}/${DEX_ORDER.length} · 별 ${stars}/${DEX_ORDER.length * 3}`);
   const c = await UI.choose(['한 해 더 (별손님들이 다시 와요)', '여기서 계속 지낸다 (손님맞이는 쉬어요)', '새로 시작한다 (도감은 이어져요)']);
@@ -1656,6 +1667,7 @@ function navDir(dir) { // 방향 버튼을 '누른 순간' (걷기는 keyDir가 
   return false;
 }
 function actionA() {
+  if (Cine.isOpen()) return Cine.tap();
   Au.unlock();
   if (mode === 'title') { const c = $('#btn-continue'); (c.classList.contains('hide') ? $('#btn-new') : c).click(); return; }
   if (panelClose) { const el = document.activeElement; if (el && $('#panel').contains(el) && el.tagName !== 'INPUT') el.click(); else movePanelFocus(1); return; }
@@ -1995,6 +2007,6 @@ function boot() {
   let last = 0;
   const loop = ts => { const dt = Math.min(0.05, (ts - last) / 1000 || 0); last = ts; update(dt); render(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, bud, openClues, allClues: () => allClues(), talkBuddy: () => runScene(talkVisitor), get hearts() { return hearts(); }, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
+  window.__morak = { get G() { return G; }, P, MAPS, get map() { return map; }, get svc() { return svc; }, get busy() { return busy; }, tapWorld, bfs, passable, addItem, story, save, interact, walkers, welcomeBack, bud, openClues, allClues: () => allClues(), playFinale: () => runScene(playFinale), talkBuddy: () => runScene(talkVisitor), get hearts() { return hearts(); }, toScreen: (tx, ty) => [(tx * T + 8 - camX) * SCALE, (ty * T + 8 - camY) * SCALE] };
 }
 boot();

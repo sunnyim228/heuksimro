@@ -41,7 +41,12 @@ export async function openGame(browser, url, { viewport = { width: 1000, height:
         ch: [...document.querySelectorAll('#choices button')].map(b => b.textContent),
         busy: window.__morak.busy, panel: !document.querySelector('#panel-layer').classList.contains('hide'),
         name: document.querySelector('#dlg-name').textContent,
+        cine: (c => c && !c.classList.contains('hide') ? (c.dataset.caption || '') : null)(document.querySelector('#cinema')),
       }));
+      if (s.cine !== null) {
+        if (s.cine && lines[lines.length - 1] !== s.cine) lines.push(s.cine);
+        await p.waitForTimeout(340); await p.click('#cinema'); continue;
+      }
       if (s.letter) { await p.waitForTimeout(550); await p.click('#letter'); }
       else if (s.ch.length) await p.click(`#choices button[data-i="${pick(s.ch)}"]`);
       else if (s.dlg) {

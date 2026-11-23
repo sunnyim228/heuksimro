@@ -26,6 +26,12 @@ export default async function ({ browser, url }) {
   G = await g.G();
   check(G.clues.length >= 5, '단서 5개');
   check(g.lines.some(l => l.includes('1장')), '단서 5개가 모이면 「1장」이 풀려요');
+  // 마지막 화 (모션그래픽)
+  g.lines.length = 0;
+  await g.ev(() => { window.__morak.playFinale(); });
+  await g.drain();
+  check((await g.G()).flags.finale1, '마지막 화를 보면 표시가 남아요');
+  check(g.lines.some(l => l.includes('덕수')), '마지막 화에서 첫 손님의 이름이 나와요');
   // 별의 소문 화면
   await g.ev(() => { window.__morak.openClues(); }); await g.page.waitForTimeout(200);
   const head = await g.ev(() => document.querySelector('#panel-body p').innerText);
